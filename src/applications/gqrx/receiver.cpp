@@ -80,12 +80,12 @@ receiver::receiver(const std::string input_device,
 
     if (input_device.empty())
     {
-        src = osmosdr::source::make("file="+get_random_file()+",freq=428e6,rate=96000,repeat=true,throttle=true");
+        src_vec.push_back(osmosdr::source::make("file="+get_random_file()+",freq=428e6,rate=96000,repeat=true,throttle=true"));
     }
     else
     {
         input_devstr = input_device;
-        src = osmosdr::source::make(input_device);
+        src_vec.push_back(osmosdr::source::make(input_device));
     }
 
     // input decimator
@@ -191,7 +191,7 @@ void receiver::set_input_device(const std::string device)
     if (device.empty())
         return;
 
-    if (input_devstr.compare(device) == 0)
+    if (input_devstr.compare(device) == 0 && !src_vec.empty())
     {
 #ifndef QT_NO_DEBUG_OUTPUT
         std::cout << "No change in input device:" << std::endl
@@ -210,14 +210,32 @@ void receiver::set_input_device(const std::string device)
         tb->wait();
     }
 
-    if (d_decim >= 2)
+    if (!src_vec.empty())
     {
-        tb->disconnect(src, 0, input_decim, 0);
-        tb->disconnect(input_decim, 0, iq_swap, 0);
+        if (d_decim >= 2)
+        {
+            tb->disconnect(src_vec[0], 0, input_decim, 0);
+            tb->disconnect(input_decim, 0, iq_swap, 0);
+        }
+        else
+        {
+            tb->disconnect(src_vec[0], 0, iq_swap, 0);
+        }
+
+        // src_vec.erase(src_vec.cbegin() + 0); /* delete src so that destructor is called to free device */
+        src_vec.clear(); /* delete src so that destructor is called to free device */
     }
-    else
+    try 
     {
-        tb->disconnect(src, 0, iq_swap, 0);
+        src_vec.push_back(osmosdr::source::make(device));
+    }
+    catch (std::exception &x)
+    {
+        std::cerr << "Failed to set input device " << device << " (" << x.what() << ")" << std::endl;
+    }
+    if (src_vec.empty())
+    {
+        return;
     }
 
     src.reset();
@@ -237,12 +255,12 @@ void receiver::set_input_device(const std::string device)
 
     if (d_decim >= 2)
     {
-        tb->connect(src, 0, input_decim, 0);
+        tb->connect(src_vec[0], 0, input_decim, 0);
         tb->connect(input_decim, 0, iq_swap, 0);
     }
     else
     {
-        tb->connect(src, 0, iq_swap, 0);
+        tb->connect(src_vec[0], 0, iq_swap, 0);
     }
 
     if (d_running)
@@ -305,7 +323,10 @@ void receiver::set_output_device(const std::string device)
 /** Get a list of available antenna connectors. */
 std::vector<std::string> receiver::get_antennas(void) const
 {
-    return src->get_antennas();
+    if (src_vec.empty())
+        return std::vector<std::string>();
+    else
+        return src_vec[0]->get_antennas();
 }
 
 /** Select antenna conenctor. */
@@ -313,7 +334,7 @@ void receiver::set_antenna(const std::string &antenna)
 {
     if (!antenna.empty())
     {
-        src->set_antenna(antenna);
+        src_vec[0]->set_antenna(antenna);
     }
 }
 
@@ -328,13 +349,16 @@ double receiver::set_input_rate(double rate)
     double  current_rate;
     bool    rate_has_changed;
 
-    current_rate = src->get_sample_rate();
+    if (src_vec.empty())
+        return 0;
+
+    current_rate = src_vec[0]->get_sample_rate();
     rate_has_changed = !(rate == current_rate ||
             std::abs(rate - current_rate) < std::abs(std::min(rate, current_rate))
             * std::numeric_limits<double>::epsilon());
 
     tb->lock();
-    d_input_rate = src->set_sample_rate(rate);
+    d_input_rate = src_vec[0]->set_sample_rate(rate);
 
     if (d_input_rate == 0)
     {
@@ -375,12 +399,12 @@ unsigned int receiver::set_input_decim(unsigned int decim)
 
     if (d_decim >= 2)
     {
-        tb->disconnect(src, 0, input_decim, 0);
+        tb->disconnect(src_vec[0], 0, input_decim, 0);
         tb->disconnect(input_decim, 0, iq_swap, 0);
     }
     else
     {
-        tb->disconnect(src, 0, iq_swap, 0);
+        tb->disconnect(src_vec[0], 0, iq_swap, 0);
     }
 
     input_decim.reset();
@@ -414,17 +438,17 @@ unsigned int receiver::set_input_decim(unsigned int decim)
 
     if (d_decim >= 2)
     {
-        tb->connect(src, 0, input_decim, 0);
+        tb->connect(src_vec[0], 0, input_decim, 0);
         tb->connect(input_decim, 0, iq_swap, 0);
     }
     else
     {
-        tb->connect(src, 0, iq_swap, 0);
+        tb->connect(src_vec[0], 0, iq_swap, 0);
     }
 
 #ifdef CUSTOM_AIRSPY_KERNELS
     if (input_devstr.find("airspy") != std::string::npos)
-        src->set_bandwidth(d_quad_rate);
+        src_vec[0]->set_bandwidth(d_quad_rate);
 #endif
 
     if (d_running)
@@ -440,13 +464,15 @@ unsigned int receiver::set_input_decim(unsigned int decim)
  */
 double receiver::set_analog_bandwidth(double bw)
 {
-    return src->set_bandwidth(bw);
+    if (src_vec.empty())
+        return 0;
+    return src_vec[0]->set_bandwidth(bw);
 }
 
 /** Get current analog bandwidth. */
 double receiver::get_analog_bandwidth(void) const
 {
-    return src->get_bandwidth();
+    return src_vec[0]->get_bandwidth();
 }
 
 /** Set I/Q reversed. */
@@ -503,12 +529,12 @@ bool receiver::get_dc_cancel(void) const
  */
 void receiver::set_iq_balance(bool enable)
 {
-    if (enable == d_iq_balance)
+    if (enable == d_iq_balance || src_vec.empty())
         return;
 
     d_iq_balance = enable;
 
-    src->set_iq_balance_mode(enable ? 2 : 0);
+    src_vec[0]->set_iq_balance_mode(enable ? 2 : 0);
 }
 
 /**
@@ -531,7 +557,10 @@ receiver::status receiver::set_rf_freq(double freq_hz)
 {
     d_rf_freq = freq_hz;
 
-    src->set_center_freq(d_rf_freq);
+    if (src_vec.empty())
+        return STATUS_ERROR;
+
+    src_vec[0]->set_center_freq(d_rf_freq);
     // FIXME: read back frequency?
 
     return STATUS_OK;
@@ -544,7 +573,10 @@ receiver::status receiver::set_rf_freq(double freq_hz)
  */
 double receiver::get_rf_freq(void)
 {
-    d_rf_freq = src->get_center_freq();
+    if (src_vec.empty())
+        return 0;
+
+    d_rf_freq = src_vec[0]->get_center_freq();
 
     return d_rf_freq;
 }
@@ -560,7 +592,10 @@ receiver::status receiver::get_rf_range(double *start, double *stop, double *ste
 {
     osmosdr::freq_range_t range;
 
-    range = src->get_freq_range();
+    if (src_vec.empty())
+        return STATUS_ERROR;
+
+    range = src_vec[0]->get_freq_range();
 
     // currently range is empty for all but E4000
     if (!range.empty())
@@ -581,7 +616,9 @@ receiver::status receiver::get_rf_range(double *start, double *stop, double *ste
 /** Get the names of available gain stages. */
 std::vector<std::string> receiver::get_gain_names()
 {
-    return src->get_gain_names();
+    if (src_vec.empty())
+        return std::vector<std::string>();
+    return src_vec[0]->get_gain_names();
 }
 
 /**
@@ -598,7 +635,10 @@ receiver::status receiver::get_gain_range(std::string &name, double *start,
 {
     osmosdr::gain_range_t range;
 
-    range = src->get_gain_range(name);
+    if (src_vec.empty())
+        return STATUS_ERROR;
+
+    range = src_vec[0]->get_gain_range(name);
     *start = range.start();
     *stop  = range.stop();
     *step  = range.step();
@@ -608,14 +648,17 @@ receiver::status receiver::get_gain_range(std::string &name, double *start,
 
 receiver::status receiver::set_gain(std::string name, double value)
 {
-    src->set_gain(value, name);
+    if (src_vec.empty())
+        return STATUS_ERROR;
+
+    src_vec[0]->set_gain(value, name);
 
     return STATUS_OK;
 }
 
 double receiver::get_gain(std::string name) const
 {
-    return src->get_gain(name);
+    return src_vec[0]->get_gain(name);
 }
 
 /**
@@ -626,7 +669,10 @@ double receiver::get_gain(std::string name) const
  */
 receiver::status receiver::set_auto_gain(bool automatic)
 {
-    src->set_gain_mode(automatic);
+    if (src_vec.empty())
+        return STATUS_ERROR;
+
+    src_vec[0]->set_gain_mode(automatic);
 
     return STATUS_OK;
 }
@@ -709,7 +755,10 @@ receiver::status receiver::set_filter(double low, double high, filter_shape shap
 
 receiver::status receiver::set_freq_corr(double ppm)
 {
-    src->set_freq_corr(ppm);
+    if (src_vec.empty())
+        return STATUS_ERROR;
+
+    src_vec[0]->set_freq_corr(ppm);
 
     return STATUS_OK;
 }
@@ -1186,7 +1235,7 @@ receiver::status receiver::stop_iq_recording()
     if (d_decim >= 2)
         tb->disconnect(input_decim, 0, iq_sink, 0);
     else
-        tb->disconnect(src, 0, iq_sink, 0);
+        tb->disconnect(src_vec[0], 0, iq_sink, 0);
 
     tb->unlock();
     iq_sink.reset();
@@ -1205,7 +1254,7 @@ receiver::status receiver::seek_iq_file(long pos)
 
     tb->lock();
 
-    if (src->seek(pos, SEEK_SET))
+    if (src_vec[0]->seek(pos, SEEK_SET))
     {
         status = STATUS_OK;
     }
@@ -1275,8 +1324,11 @@ void receiver::connect_all(rx_chain type)
 {
     gr::basic_block_sptr b;
 
+    if (src_vec.empty())
+        return;
+
     // Setup source
-    b = src;
+    b = src_vec[0];
 
     // Pre-processing
     if (d_decim >= 2)
