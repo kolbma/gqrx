@@ -49,7 +49,7 @@
 #include "applications/gqrx/receiver.h"
 #endif
 
-#include "freqhistory.h"
+#include "applications/gqrx/freqhistory.h"
 
 namespace Ui {
     class MainWindow;  /*! The main window UI */
