@@ -38,6 +38,7 @@ public:
     void setCenterLineEnabled(bool enabled) { m_CenterLineEnabled = enabled; }
     void setTooltipsEnabled(bool enabled) { m_TooltipsEnabled = enabled; }
     void setBookmarksEnabled(bool enabled) { m_BookmarksEnabled = enabled; }
+    void setBandPlanEnabled(bool enabled) { m_BandPlanEnabled = enabled; }
 
     void setNewFftData(float *fftData, int size);
     void setNewFftData(float *fftData, float *wfData, int size);
@@ -146,6 +147,7 @@ public slots:
     void setPandapterRange(float min, float max);
     void setWaterfallRange(float min, float max);
     void setPeakDetection(bool enabled, float c);
+    void toggleBandPlan(bool state);
     void updateOverlay();
 
     void setPercent2DScreen(int percent)

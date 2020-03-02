@@ -1690,6 +1690,12 @@ void CPlotter::setPeakDetection(bool enabled, float c)
         m_PeakDetection = c;
 }
 
+void CPlotter::toggleBandPlan(bool state)
+{
+    m_BandPlanEnabled = state;
+    updateOverlay();
+}
+
 void CPlotter::calcDivSize (qint64 low, qint64 high, int divswanted, qint64 &adjlow, qint64 &step, int& divs)
 {
 #ifdef PLOTTER_DEBUG
