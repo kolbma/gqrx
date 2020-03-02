@@ -56,6 +56,7 @@
 #include "remote_control_settings.h"
 
 #include "qtgui/bookmarkstaglist.h"
+#include "qtgui/bandplan.h"
 
 MainWindow::MainWindow(const QString cfgfile, bool edit_conf, QWidget *parent) :
     QMainWindow(parent),
@@ -68,6 +69,7 @@ MainWindow::MainWindow(const QString cfgfile, bool edit_conf, QWidget *parent) :
     dec_afsk1200(0)
 {
     ui->setupUi(this);
+    BandPlan::create();
     Bookmarks::create();
 
     /* Initialise default configuration directory */
@@ -127,7 +129,9 @@ MainWindow::MainWindow(const QString cfgfile, bool edit_conf, QWidget *parent) :
     uiDockAudio = new DockAudio();
     uiDockInputCtl = new DockInputCtl();
     uiDockFft = new DockFft();
+    BandPlan::Get().setConfigDir(m_cfg_dir);
     Bookmarks::Get().setConfigDir(m_cfg_dir);
+    BandPlan::Get().load();
     uiDockBookmarks = new DockBookmarks(this);
 
     // setup some toggle view shortcuts

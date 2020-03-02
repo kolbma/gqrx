@@ -223,7 +223,8 @@ private:
     qint64      m_FreqPerDiv;
     bool        m_CenterLineEnabled;  /*!< Distinguish center line. */
     bool        m_FilterBoxEnabled;   /*!< Draw filter box. */
-    bool        m_TooltipsEnabled;     /*!< Tooltips enabled */
+    bool        m_TooltipsEnabled;    /*!< Tooltips enabled */
+    bool        m_BandPlanEnabled;    /*!< Show/hide band plan on spectrum */
     bool        m_BookmarksEnabled;   /*!< Show/hide bookmarks on spectrum */
     int         m_DemodHiCutFreq;
     int         m_DemodLowCutFreq;
