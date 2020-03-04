@@ -64,6 +64,7 @@ int gettimeofday(struct timeval * tp, struct timezone * tzp)
 #include <QtGlobal>
 #include <QToolTip>
 #include "plotter.h"
+#include "bandplan.h"
 #include "bookmarks.h"
 
 // Comment out to enable plotter debug messages
@@ -146,6 +147,7 @@ CPlotter::CPlotter(QWidget *parent) : QFrame(parent)
 
     m_FilterBoxEnabled = true;
     m_CenterLineEnabled = true;
+    m_BandPlanEnabled = true;
     m_BookmarksEnabled = true;
 
     m_Span = 96000;
@@ -1335,6 +1337,29 @@ void CPlotter::drawOverlay()
         }
     }
 
+    if (m_BandPlanEnabled)
+    {
+        QList<BandInfo> bands = BandPlan::Get().getBandsInRange(m_CenterFreq + m_FftCenter - m_Span / 2,
+                                                                m_CenterFreq + m_FftCenter + m_Span / 2);
+
+        for (int i = 0; i < bands.size(); i++)
+        {
+            int min_pos = xFromFreq(bands[i].minFrequency);
+            int max_pos = xFromFreq(bands[i].maxFrequency);
+            int del_pos = max_pos - min_pos;
+            rect.setRect(min_pos, h - 45, del_pos, h);
+            painter.fillRect(rect, bands[i].color);
+            int textWidth = metrics.width(bands[i].name + " (" + bands[i].modulation + ")");
+            if (min_pos < w && del_pos > textWidth + 20)
+            {
+                painter.setOpacity(1.0);
+                rect.setRect(min_pos + 10, h - 40, textWidth + 10, metrics.height());
+                painter.setPen(QColor(PLOTTER_TEXT_COLOR));
+                painter.drawText(rect, Qt::AlignHCenter, bands[i].name + " (" + bands[i].modulation + ")");
+            }
+        }
+    }
+
     if (m_CenterLineEnabled)
     {
         x = xFromFreq(m_CenterFreq);
@@ -1506,7 +1531,7 @@ void CPlotter::makeFrequencyStrs()
     }
 }
 
-// Convert from screen coordinate to frequency
+// Convert from frequency to screen coordinate
 int CPlotter::xFromFreq(qint64 freq)
 {
     int w = m_OverlayPixmap.width();
@@ -1519,7 +1544,7 @@ int CPlotter::xFromFreq(qint64 freq)
     return x;
 }
 
-// Convert from frequency to screen coordinate
+// Convert from screen coordinate to frequency
 qint64 CPlotter::freqFromX(int x)
 {
     int w = m_OverlayPixmap.width();
@@ -1663,6 +1688,12 @@ void CPlotter::setPeakDetection(bool enabled, float c)
         m_PeakDetection = -1;
     else
         m_PeakDetection = c;
+}
+
+void CPlotter::toggleBandPlan(bool state)
+{
+    m_BandPlanEnabled = state;
+    updateOverlay();
 }
 
 void CPlotter::calcDivSize (qint64 low, qint64 high, int divswanted, qint64 &adjlow, qint64 &step, int& divs)
