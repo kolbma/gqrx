@@ -642,7 +642,7 @@ bool MainWindow::loadConfig(const QString cfgfile, bool check_crash,
  * assumed to be the name of a file under m_cfg_dir.
  *
  * If cfgfile already exists it will be overwritten (we assume that a file
- * selection dialog has already asked for confirmation of overwrite.
+ * selection dialog has already asked for confirmation of overwrite).
  *
  * Since QSettings does not support "save as" we do this by copying the current
  * settings to a new file.
