@@ -20,17 +20,18 @@
  * the Free Software Foundation, Inc., 51 Franklin Street,
  * Boston, MA 02110-1301, USA.
  */
-#include "bookmarkstaglist.h"
-#include "bookmarks.h"
-#include <QColorDialog>
-#include <stdio.h>
-#include <QMenu>
-#include <QHeaderView>
 
-BookmarksTagList::BookmarksTagList(QWidget *parent, bool bShowUntagged )
-    : QTableWidget(parent)
-    , m_bUpdating(false)
-    , m_bShowUntagged(bShowUntagged)
+#include <QColorDialog>
+#include <QHeaderView>
+#include <QMenu>
+
+#include "bookmarks.h"
+#include "bookmarkstaglist.h"
+
+BookmarksTagList::BookmarksTagList(QWidget *parent, bool bShowUntagged)
+    : QTableWidget(parent),
+      m_bUpdating(false),
+      m_bShowUntagged(bShowUntagged)
 {
     connect(this, SIGNAL(cellClicked(int,int)),
             this, SLOT(on_cellClicked(int,int)));
@@ -52,40 +53,36 @@ BookmarksTagList::BookmarksTagList(QWidget *parent, bool bShowUntagged )
 
 void BookmarksTagList::on_cellClicked(int row, int column)
 {
-    if(column==0)
+    if(column == 0)
     {
         changeColor(row, column);
     }
-    if(column==1)
+    if(column == 1)
     {
         toggleCheckedState(row, column);
     }
 }
 
-void BookmarksTagList::changeColor(int row, int /*column*/)
+void BookmarksTagList::changeColor(int row, int column)
 {
-    TagInfo &info = Bookmarks::Get().findOrAddTag(item(row, 1)->text());
+    TagInfo &info = Bookmarks::get().findOrAddTag(item(row, 1)->text());
     QColor color = QColorDialog::getColor(info.color, this);
 
     if(!color.isValid())
         return;
 
-    info.color=color;
+    info.color = color;
     updateTags();
-    Bookmarks::Get().save();
+    Bookmarks::get().save();
 }
 
 void BookmarksTagList::toggleCheckedState(int row, int column)
 {
-    QTableWidgetItem* p = item(row,column);
-    if(p->checkState()==Qt::Unchecked)
-    {
+    QTableWidgetItem *p = item(row, column);
+    if(p->checkState() == Qt::Unchecked)
         p->setCheckState(Qt::Checked);
-    }
     else
-    {
         p->setCheckState(Qt::Unchecked);
-    }
 }
 
 void BookmarksTagList::updateTags()
@@ -94,20 +91,20 @@ void BookmarksTagList::updateTags()
 
     // Remember which items were unchecked.
     QStringList unchecked;
-    for(int i=0; i<rowCount(); i++)
+    for(int i=0; i < rowCount(); i++)
     {
-        if(item(i,1)->checkState()==Qt::Unchecked)
-            unchecked.append(item(i,1)->text());
+        if(item(i,1)->checkState() == Qt::Unchecked)
+            unchecked.append(item(i, 1)->text());
     }
 
     // Get current List of Tags.
-    QList<TagInfo> newTags = Bookmarks::Get().getTagList();
+    QList<TagInfo> newTags = Bookmarks::get().getTagList();
     if(!m_bShowUntagged)
     {
-        for(int i=0; i<newTags.size(); ++i)
+        for(int i=0; i < newTags.size(); ++i)
         {
-            TagInfo& taginfo = newTags[i];
-            if(taginfo.name.compare(TagInfo::strUntagged)==0)
+            TagInfo &taginfo = newTags[i];
+            if(taginfo.name.compare(TagInfo::strUntagged) == 0)
             {
                 newTags.removeAt(i);
                 break;
@@ -119,24 +116,24 @@ void BookmarksTagList::updateTags()
     clear();
     setSortingEnabled(false);
     setRowCount(0);
-    for(int i=0; i<newTags.count(); i++)
+    for(int i=0; i < newTags.count(); i++)
     {
         AddTag(newTags[i].name,
-                  ( unchecked.contains(newTags[i].name) ? Qt::Unchecked : Qt::Checked ),
-                  newTags[i].color);
+               unchecked.contains(newTags[i].name) ? Qt::Unchecked : Qt::Checked,
+               newTags[i].color);
     }
     setSortingEnabled(true);
 
     m_bUpdating = false;
 }
 
-void BookmarksTagList::setSelectedTagsAsString(const QString& strTags)
+void BookmarksTagList::setSelectedTagsAsString(const QString &strTags)
 {
     QStringList list = strTags.split(",");
     int iRows = rowCount();
-    for(int i=0; i<iRows; ++i)
+    for(int i=0; i < iRows; ++i)
     {
-        QTableWidgetItem* pItem = item(i,1);
+        QTableWidgetItem *pItem = item(i, 1);
         QString name = pItem->text();
         bool bChecked = list.contains(name);
         pItem->setCheckState(bChecked ? Qt::Checked : Qt::Unchecked);
@@ -147,15 +144,16 @@ void BookmarksTagList::setSelectedTagsAsString(const QString& strTags)
 void BookmarksTagList::setSelectedTags(QList<TagInfo*> tags)
 {
     int iRows = rowCount();
-    for(int i=0; i<iRows; ++i)
+    for(int i=0; i < iRows; ++i)
     {
-        QTableWidgetItem* pItem = item(i,1);
+        QTableWidgetItem *pItem = item(i,1);
         QString name = pItem->text();
         bool bChecked = false;
-        for(QList<TagInfo*>::const_iterator it=tags.begin(), itend=tags.end(); it!=itend; ++it)
+        for(QList<TagInfo*>::const_iterator it=tags.begin(), itend=tags.end(); it != itend; ++it)
         {
-            TagInfo* pTag = *it;
-            if(pTag->name == name) bChecked = true;
+            TagInfo *pTag = *it;
+            if(pTag->name == name)
+                bChecked = true;
         }
         pItem->setCheckState(bChecked ? Qt::Checked : Qt::Unchecked);
     }
@@ -168,12 +166,13 @@ QString BookmarksTagList::getSelectedTagsAsString()
 
     int iRows = rowCount();
     bool bFirst = true;
-    for(int i=0; i<iRows; ++i)
+    for(int i=0; i < iRows; ++i)
     {
-        QTableWidgetItem* pItem = item(i,1);
+        QTableWidgetItem *pItem = item(i, 1);
         if(pItem->checkState() == Qt::Checked)
         {
-            if(!bFirst) strResult += ", ";
+            if(!bFirst)
+                strResult += ", ";
             strResult += pItem->text();
             bFirst = false;
         }
@@ -181,9 +180,9 @@ QString BookmarksTagList::getSelectedTagsAsString()
     return strResult;
 }
 
-void BookmarksTagList::ShowContextMenu(const QPoint& pos)
+void BookmarksTagList::ShowContextMenu(const QPoint &pos)
 {
-    QMenu* menu=new QMenu(this);
+    QMenu *menu = new QMenu(this);  // TODO: check if there is a delete!!!
 
     // Rename currently does not work.
     // The problem is that after the tag name is changed in GUI
@@ -192,7 +191,7 @@ void BookmarksTagList::ShowContextMenu(const QPoint& pos)
     #if 0
     // MenuItem "Rename"
     {
-        QAction* actionRename = new QAction("Rename", this);
+        QAction *actionRename = new QAction("Rename", this);
         menu->addAction(actionRename);
         connect(actionRename, SIGNAL(triggered()), this, SLOT(RenameSelectedTag()));
     }
@@ -200,28 +199,28 @@ void BookmarksTagList::ShowContextMenu(const QPoint& pos)
 
     // MenuItem "Create new Tag"
     {
-        QAction* actionNewTag = new QAction("Create new Tag", this);
+        QAction *actionNewTag = new QAction("Create new Tag", this);
         menu->addAction(actionNewTag);
         connect(actionNewTag, SIGNAL(triggered()), this, SLOT(AddNewTag()));
     }
 
     // Menu "Delete Tag"
     {
-        QAction* actionDeleteTag = new QAction("Delete Tag", this);
+        QAction *actionDeleteTag = new QAction("Delete Tag", this);
         menu->addAction(actionDeleteTag);
         connect(actionDeleteTag, SIGNAL(triggered()), this, SLOT(DeleteSelectedTag()));
     }
 
     // Menu "Select All"
     {
-        QAction* action = new QAction("Select All", this);
+        QAction *action = new QAction("Select All", this);
         menu->addAction(action);
         connect(action, SIGNAL(triggered()), this, SLOT(SelectAll()));
     }
 
     // Menu "Deselect All"
     {
-        QAction* action = new QAction("Deselect All", this);
+        QAction *action = new QAction("Deselect All", this);
         menu->addAction(action);
         connect(action, SIGNAL(triggered()), this, SLOT(DeselectAll()));
     }
@@ -240,9 +239,9 @@ bool BookmarksTagList::RenameSelectedTag()
     }
 
     int iRow = selected.first().row();
-    QTableWidgetItem* pItem = item(iRow,1);bUpdating
+    QTableWidgetItem *pItem = item(iRow,1);bUpdating
     editItem(pItem);
-    //Bookmarks::Get().save();
+    //Bookmarks::get().save();
 
     return true;
 }
@@ -252,13 +251,13 @@ void BookmarksTagList::AddNewTag()
 {
     AddTag("*new*");
     scrollToBottom();
-    editItem(item(rowCount()-1, 1));
+    editItem(item(rowCount() - 1, 1));
 }
 
 void BookmarksTagList::AddTag(QString name, Qt::CheckState checkstate, QColor color)
 {
     int i = rowCount();
-    setRowCount(i+1);
+    setRowCount(i + 1);
 
     // Column 1
     QTableWidgetItem *item = new QTableWidgetItem(name);
@@ -277,28 +276,27 @@ void BookmarksTagList::DeleteSelectedTag()
 {
     QModelIndexList selected = selectionModel()->selectedRows();
     if(selected.empty())
-    {
         return;
-    }
+
     int iRow = selected.first().row();
-    QTableWidgetItem* pItem = item(iRow,1);
+    QTableWidgetItem *pItem = item(iRow, 1);
     QString strTagName = pItem->text();
     DeleteTag(strTagName);
     return;
 }
 
-void BookmarksTagList::DeleteTag(const QString& name)
+void BookmarksTagList::DeleteTag(const QString &name)
 {
-    Bookmarks::Get().removeTag(name);
+    Bookmarks::get().removeTag(name);
     updateTags();
 }
 
 void BookmarksTagList::SelectAll()
 {
     int iRows = rowCount();
-    for(int i=0; i<iRows; ++i)
+    for(int i=0; i < iRows; ++i)
     {
-        QTableWidgetItem* pItem = item(i,1);
+        QTableWidgetItem *pItem = item(i, 1);
         QString name = pItem->text();
         pItem->setCheckState(Qt::Checked);
     }
@@ -307,9 +305,9 @@ void BookmarksTagList::SelectAll()
 void BookmarksTagList::DeselectAll()
 {
     int iRows = rowCount();
-    for(int i=0; i<iRows; ++i)
+    for(int i=0; i < iRows; ++i)
     {
-        QTableWidgetItem* pItem = item(i,1);
+        QTableWidgetItem *pItem = item(i, 1);
         QString name = pItem->text();
         pItem->setCheckState(Qt::Unchecked);
     }

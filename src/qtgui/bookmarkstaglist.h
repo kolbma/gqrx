@@ -24,35 +24,37 @@
 #define BOOKMARKSTAGLIST_H
 
 #include <QTableWidget>
+
 #include "bookmarks.h"
 
-/// A QWidget containing the List of Bookmark-Tags.
+/**
+ * @brief A QWidget containing the List of Bookmark-Tags
+ */
 class BookmarksTagList : public QTableWidget
 {
     Q_OBJECT
+
 public:
     explicit BookmarksTagList(QWidget *parent = 0, bool bShowUntagged = true);
     QString getSelectedTagsAsString();
-    void setSelectedTagsAsString(const QString& strTags);
+    void setSelectedTagsAsString(const QString &strTags);
     void setSelectedTags(QList<TagInfo*> tags);
     bool m_bUpdating;
 
 private:
     bool m_bShowUntagged;
 
-signals:
-
 public slots:
     void updateTags();
     void on_cellClicked(int row, int column);
     void changeColor(int row, int column);
     void toggleCheckedState(int row, int column);
-    void ShowContextMenu(const QPoint& pos);
+    void ShowContextMenu(const QPoint &pos);
     //bool RenameSelectedTag();
     void AddNewTag();
     void AddTag(QString name, Qt::CheckState checkstate = Qt::Checked, QColor color = TagInfo::DefaultColor);
     void DeleteSelectedTag();
-    void DeleteTag(const QString& name);
+    void DeleteTag(const QString &name);
     void SelectAll();
     void DeselectAll();
 };

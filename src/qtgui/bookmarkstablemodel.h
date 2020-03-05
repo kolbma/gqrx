@@ -24,10 +24,8 @@
 #define BOOKMARKSTABLEMODEL_H
 
 #include <QAbstractTableModel>
-#include <QList>
 
 #include "bookmarks.h"
-
 
 class BookmarksTableModel : public QAbstractTableModel
 {
@@ -45,21 +43,20 @@ public:
 
     explicit BookmarksTableModel(QObject *parent = 0);
     
-    int rowCount ( const QModelIndex & parent = QModelIndex() ) const;
-    int columnCount ( const QModelIndex & parent = QModelIndex() ) const;
-    QVariant headerData ( int section, Qt::Orientation orientation, int role = Qt::DisplayRole ) const;
-    QVariant data ( const QModelIndex & index, int role = Qt::DisplayRole ) const;
-    bool setData ( const QModelIndex & index, const QVariant & value, int role = Qt::EditRole );
-    Qt::ItemFlags flags ( const QModelIndex & index ) const;
+    int rowCount(const QModelIndex &parent = QModelIndex()) const;
+    int columnCount(const QModelIndex &parent = QModelIndex()) const;
+    QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const;
+    QVariant data(const QModelIndex &index, int role = Qt::DisplayRole ) const;
+    bool setData(const QModelIndex &index, const QVariant & value, int role = Qt::EditRole);
+    Qt::ItemFlags flags(const QModelIndex &index) const;
 
-    BookmarkInfo* getBookmarkAtRow(int row);
+    BookmarkInfo *getBookmarkAtRow(int row);
     int GetBookmarksIndexForRow(int iRow);
 
 private:
     QList<BookmarkInfo*> m_Bookmarks;
-    QMap<int,int> m_mapRowToBookmarksIndex;
+    QMap<int, int> m_mapRowToBookmarksIndex;
 
-signals:
 public slots:
     void update();
 

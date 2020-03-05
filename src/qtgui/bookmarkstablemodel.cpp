@@ -20,28 +20,26 @@
  * the Free Software Foundation, Inc., 51 Franklin Street,
  * Boston, MA 02110-1301, USA.
  */
-#include <QFile>
-#include <QStringList>
+
 #include "bookmarks.h"
 #include "bookmarkstablemodel.h"
 #include "dockrxopt.h"
-
 
 BookmarksTableModel::BookmarksTableModel(QObject *parent) :
     QAbstractTableModel(parent)
 {
 }
 
-int BookmarksTableModel::rowCount ( const QModelIndex & /*parent*/ ) const
+int BookmarksTableModel::rowCount(const QModelIndex &parent) const
 {
     return m_Bookmarks.size();
 }
-int BookmarksTableModel::columnCount ( const QModelIndex & /*parent*/ ) const
+int BookmarksTableModel::columnCount(const QModelIndex &parent) const
 {
     return 5;
 }
 
-QVariant BookmarksTableModel::headerData ( int section, Qt::Orientation orientation, int role ) const
+QVariant BookmarksTableModel::headerData(int section, Qt::Orientation orientation, int role) const
 {
     if(orientation == Qt::Horizontal && role == Qt::DisplayRole)
     {
@@ -71,37 +69,37 @@ QVariant BookmarksTableModel::headerData ( int section, Qt::Orientation orientat
     return QVariant();
 }
 
-QVariant BookmarksTableModel::data ( const QModelIndex & index, int role ) const
+QVariant BookmarksTableModel::data(const QModelIndex &index, int role) const
 {
-    BookmarkInfo& info = *m_Bookmarks[index.row()];
+    BookmarkInfo &info = *m_Bookmarks[index.row()];
 
-    if(role==Qt::BackgroundColorRole)
+    if (role == Qt::BackgroundColorRole)
     {
         QColor bg(info.GetColor());
         bg.setAlpha(0x60);
         return bg;
     }
-    else if(role == Qt::DisplayRole || role==Qt::EditRole)
+    else if(role == Qt::DisplayRole || role == Qt::EditRole)
     {
         switch(index.column())
         {
         case COL_FREQUENCY:
                 return info.frequency;
         case COL_NAME:
-                return (role==Qt::EditRole)?QString(info.name):info.name;
+                return (role == Qt::EditRole) ? QString(info.name) : info.name;
         case COL_MODULATION:
                 return info.modulation;
         case COL_BANDWIDTH:
-            return (info.bandwidth==0)?QVariant(""):QVariant(info.bandwidth);
+            return (info.bandwidth == 0) ? QVariant("") : QVariant(info.bandwidth);
          case COL_TAGS:
             QString strTags;
-            for(int iTag=0; iTag<info.tags.size(); ++iTag)
+            for(int iTag=0; iTag < info.tags.size(); ++iTag)
             {
-                if(iTag!=0)
+                if(iTag != 0)
                 {
                     strTags.append(",");
                 }
-                TagInfo& tag = *info.tags[iTag];
+                TagInfo &tag = *info.tags[iTag];
                 strTags.append(tag.name);
             }
             return strTags;
@@ -112,7 +110,7 @@ QVariant BookmarksTableModel::data ( const QModelIndex & index, int role ) const
 
 bool BookmarksTableModel::setData(const QModelIndex &index, const QVariant &value, int role)
 {
-    if(role==Qt::EditRole)
+    if(role == Qt::EditRole)
     {
         BookmarkInfo &info = *m_Bookmarks[index.row()];
         switch(index.column())
@@ -151,10 +149,10 @@ bool BookmarksTableModel::setData(const QModelIndex &index, const QVariant &valu
                 info.tags.clear();
                 QString strValue = value.toString();
                 QStringList strList = strValue.split(",");
-                for(int i=0; i<strList.size(); ++i)
+                for(int i=0; i < strList.size(); ++i)
                 {
                     QString strTag = strList[i].trimmed();
-                    info.tags.append( &Bookmarks::Get().findOrAddTag(strTag) );
+                    info.tags.append(&Bookmarks::get().findOrAddTag(strTag));
                 }
                 emit dataChanged(index, index);
                 return true;
@@ -166,7 +164,7 @@ bool BookmarksTableModel::setData(const QModelIndex &index, const QVariant &valu
     return false;
 }
 
-Qt::ItemFlags BookmarksTableModel::flags ( const QModelIndex& index ) const
+Qt::ItemFlags BookmarksTableModel::flags(const QModelIndex &index) const
 {
     Qt::ItemFlags flags = 0;
 
@@ -189,14 +187,14 @@ void BookmarksTableModel::update()
 {
     int iRow = 0;
     m_Bookmarks.clear();
-    for(int iBookmark=0; iBookmark<Bookmarks::Get().size(); iBookmark++)
+    for(int iBookmark = 0; iBookmark < Bookmarks::get().size(); iBookmark++)
     {
-        BookmarkInfo& info = Bookmarks::Get().getBookmark(iBookmark);
+        BookmarkInfo &info = Bookmarks::get().getBookmark(iBookmark);
 
         bool bActive = false;
-        for(int iTag=0; iTag<info.tags.size(); ++iTag)
+        for(int iTag = 0; iTag < info.tags.size(); ++iTag)
         {
-            TagInfo& tag = *info.tags[iTag];
+            TagInfo &tag = *info.tags[iTag];
             if(tag.active)
             {
                 bActive = true;
@@ -205,7 +203,7 @@ void BookmarksTableModel::update()
         }
         if(bActive)
         {
-            m_mapRowToBookmarksIndex[iRow]=iBookmark;
+            m_mapRowToBookmarksIndex[iRow] = iBookmark;
             m_Bookmarks.append(&info);
             ++iRow;
         }

@@ -23,34 +23,33 @@
 #ifndef BOOKMARKS_H
 #define BOOKMARKS_H
 
-#include <QtGlobal>
-#include <QObject>
-#include <QString>
-#include <QMap>
-#include <QList>
-#include <QStringList>
 #include <QColor>
+#include <QMap>
+#include <QObject>
+#include <QStringList>
 
 struct TagInfo
 {
+    static const QColor DefaultColor;
+    static const QString strUntagged;
+
     QString name;
     QColor color;
     bool active;
 
-    static const QColor DefaultColor;
-    static const QString strUntagged;
-
     TagInfo()
     {
-        active=true;
-        this->color=DefaultColor;
+        active = true;
+        this->color = DefaultColor;
     }
+
     TagInfo(QString name)
     {
-        active=true;
-        this->color=DefaultColor;
+        active = true;
+        this->color = DefaultColor;
         this->name = name;
     }
+
     bool operator<(const TagInfo &other) const
     {
         return name < other.name;
@@ -100,20 +99,20 @@ class Bookmarks : public QObject
 public:
     // This is a Singleton Class now because you can not send qt-signals from static functions.
     static void create();
-    static Bookmarks& Get();
+    static Bookmarks &get();
 
-    void add(BookmarkInfo& info);
+    void add(BookmarkInfo &info);
     void remove(int index);
     bool load();
     bool save();
     int size() { return m_BookmarkList.size(); }
-    BookmarkInfo& getBookmark(int i) { return m_BookmarkList[i]; }
+    BookmarkInfo &getBookmark(int i) { return m_BookmarkList[i]; }
     QList<BookmarkInfo> getBookmarksInRange(qint64 low, qint64 high);
     //int lowerBound(qint64 low);
     //int upperBound(qint64 high);
 
     QList<TagInfo> getTagList() { return  QList<TagInfo>(m_TagList); }
-    TagInfo& findOrAddTag(QString tagName);
+    TagInfo &findOrAddTag(QString tagName);
     int getTagIndex(QString tagName);
     bool removeTag(QString tagName);
     bool setTagChecked(QString tagName, bool bChecked);
@@ -125,7 +124,7 @@ private:
     QList<BookmarkInfo> m_BookmarkList;
     QList<TagInfo> m_TagList;
     QString        m_bookmarksFile;
-    static Bookmarks* m_pThis;
+    static Bookmarks *m_pThis;
 
 signals:
     void BookmarksChanged(void);
