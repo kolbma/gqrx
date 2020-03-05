@@ -52,7 +52,7 @@ public slots:
     void ShowContextMenu(const QPoint &pos);
     //bool RenameSelectedTag();
     void AddNewTag();
-    void AddTag(QString name, Qt::CheckState checkstate = Qt::Checked, QColor color = TagInfo::DefaultColor);
+    void AddTag(QString name, Qt::CheckState checkstate = Qt::Checked, QColor color = TagInfo::DEFAULT_COLOR);
     void DeleteSelectedTag();
     void DeleteTag(const QString &name);
     void SelectAll();

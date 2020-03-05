@@ -104,7 +104,7 @@ void BookmarksTagList::updateTags()
         for(int i=0; i < newTags.size(); ++i)
         {
             TagInfo &taginfo = newTags[i];
-            if(taginfo.name.compare(TagInfo::strUntagged) == 0)
+            if(taginfo.name.compare(TagInfo::UNTAGGED) == 0)
             {
                 newTags.removeAt(i);
                 break;

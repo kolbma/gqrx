@@ -30,8 +30,8 @@
 
 struct TagInfo
 {
-    static const QColor DefaultColor;
-    static const QString strUntagged;
+    static const QColor DEFAULT_COLOR;
+    static const QString UNTAGGED;
 
     QString name;
     QColor color;
@@ -40,13 +40,13 @@ struct TagInfo
     TagInfo()
     {
         active = true;
-        this->color = DefaultColor;
+        this->color = DEFAULT_COLOR;
     }
 
-    TagInfo(QString name)
+    TagInfo(const QString &name)
     {
         active = true;
-        this->color = DefaultColor;
+        this->color = DEFAULT_COLOR;
         this->name = name;
     }
 
@@ -89,8 +89,8 @@ struct BookmarkInfo
     bool hasTags(QStringList _tags);
  */
 
-    const QColor GetColor() const;
-    bool IsActive() const;
+    const QColor getColor() const;
+    bool isActive() const;
 };
 
 class Bookmarks : public QObject
@@ -127,8 +127,8 @@ private:
     static Bookmarks *m_pThis;
 
 signals:
-    void BookmarksChanged(void);
-    void TagListChanged(void);
+    void bookmarksChanged(void);
+    void tagListChanged(void);
 };
 
 #endif // BOOKMARKS_H

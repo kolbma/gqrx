@@ -21,10 +21,6 @@
  * Boston, MA 02110-1301, USA.
  */
 
-#include <algorithm>
-#include <stdio.h>
-#include <wchar.h>
-
 #ifndef QT_NO_DEBUG_OUTPUT
 #include <QDebug>
 #endif
@@ -34,13 +30,13 @@
 
 #include "bookmarks.h"
 
-const QColor TagInfo::DefaultColor(Qt::lightGray);
-const QString TagInfo::strUntagged("Untagged");
+const QColor TagInfo::DEFAULT_COLOR(Qt::lightGray);
+const QString TagInfo::UNTAGGED("Untagged");
 Bookmarks *Bookmarks::m_pThis = 0;
 
 Bookmarks::Bookmarks()
 {
-     TagInfo tag(TagInfo::strUntagged);
+     TagInfo tag(TagInfo::UNTAGGED);
      m_TagList.append(tag);
 }
 
@@ -67,14 +63,14 @@ void Bookmarks::add(BookmarkInfo &info)
     m_BookmarkList.append(info);
     std::stable_sort(m_BookmarkList.begin(), m_BookmarkList.end());
     save();
-    emit BookmarksChanged();
+    emit bookmarksChanged();
 }
 
 void Bookmarks::remove(int index)
 {
     m_BookmarkList.removeAt(index);
     save();
-    emit BookmarksChanged();
+    emit bookmarksChanged();
 }
 
 bool Bookmarks::load()
@@ -86,7 +82,7 @@ bool Bookmarks::load()
         m_TagList.clear();
 
         // always create the "Untagged" entry.
-        findOrAddTag(TagInfo::strUntagged);
+        findOrAddTag(TagInfo::UNTAGGED);
 
         // Read Tags, until first empty line.
         while (!file.atEnd())
@@ -151,7 +147,7 @@ bool Bookmarks::load()
         file.close();
         std::stable_sort(m_BookmarkList.begin(), m_BookmarkList.end());
 
-        emit BookmarksChanged();
+        emit bookmarksChanged();
         return true;
     }
     return false;
@@ -248,7 +244,7 @@ TagInfo &Bookmarks::findOrAddTag(QString tagName)
     tagName = tagName.trimmed();
 
     if (tagName.isEmpty())
-        tagName=TagInfo::strUntagged;
+        tagName=TagInfo::UNTAGGED;
 
     int idx = getTagIndex(tagName);
 
@@ -258,7 +254,7 @@ TagInfo &Bookmarks::findOrAddTag(QString tagName)
     TagInfo info;
     info.name = tagName;
     m_TagList.append(info);
-    emit TagListChanged();
+    emit tagListChanged();
     return m_TagList.last();
 }
 
@@ -267,7 +263,7 @@ bool Bookmarks::removeTag(QString tagName)
     tagName = tagName.trimmed();
 
     // Do not delete "Untagged" tag.
-    if(tagName.compare(TagInfo::strUntagged, tagName)==0)
+    if(tagName.compare(TagInfo::UNTAGGED, tagName) == 0)
         return false;
 
     int idx = getTagIndex(tagName);
@@ -287,7 +283,7 @@ bool Bookmarks::removeTag(QString tagName)
                 if(bmi.tags.size() > 1)
                     bmi.tags.removeAt(t);
                 else
-                    bmi.tags[0] = &findOrAddTag(TagInfo::strUntagged);
+                    bmi.tags[0] = &findOrAddTag(TagInfo::UNTAGGED);
             }
         }
     }
@@ -295,8 +291,8 @@ bool Bookmarks::removeTag(QString tagName)
     // Delete Tag.
     m_TagList.removeAt(idx);
 
-    emit BookmarksChanged();
-    emit TagListChanged();
+    emit bookmarksChanged();
+    emit tagListChanged();
 
     return true;
 }
@@ -306,8 +302,8 @@ bool Bookmarks::setTagChecked(QString tagName, bool bChecked)
     int idx = getTagIndex(tagName);
     if (idx == -1) return false;
     m_TagList[idx].active = bChecked;
-    emit BookmarksChanged();
-    emit TagListChanged();
+    emit bookmarksChanged();
+    emit tagListChanged();
     return true;
 }
 
@@ -323,7 +319,7 @@ int Bookmarks::getTagIndex(QString tagName)
     return -1;
 }
 
-const QColor BookmarkInfo::GetColor() const
+const QColor BookmarkInfo::getColor() const
 {
     for(int iTag=0; iTag < tags.size(); ++iTag)
     {
@@ -331,10 +327,10 @@ const QColor BookmarkInfo::GetColor() const
         if(tag.active)
             return tag.color;
     }
-    return TagInfo::DefaultColor;
+    return TagInfo::DEFAULT_COLOR;
 }
 
-bool BookmarkInfo::IsActive() const
+bool BookmarkInfo::isActive() const
 {
     bool bActive = false;
     for(int iTag=0; iTag < tags.size(); ++iTag)

@@ -75,7 +75,7 @@ QVariant BookmarksTableModel::data(const QModelIndex &index, int role) const
 
     if (role == Qt::BackgroundColorRole)
     {
-        QColor bg(info.GetColor());
+        QColor bg(info.getColor());
         bg.setAlpha(0x60);
         return bg;
     }
