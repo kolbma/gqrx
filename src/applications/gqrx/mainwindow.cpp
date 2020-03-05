@@ -297,6 +297,9 @@ MainWindow::MainWindow(const QString cfgfile, bool edit_conf, QWidget *parent) :
     // restored because device probing might change the device configuration
     CIoConfig::getDeviceList(devList);
 
+    m_recent_config = new RecentConfig(m_cfg_dir, ui->menu_RecentConfig);
+    connect(m_recent_config, &RecentConfig::loadConfig, this, &MainWindow::loadConfigSlot);
+
     // restore last session
     if (!loadConfig(cfgfile, true, true))
     {
@@ -367,6 +370,8 @@ MainWindow::~MainWindow()
         m_settings->sync();
         delete m_settings;
     }
+
+    delete m_recent_config;
 
     delete iq_tool;
     delete ui;
@@ -630,6 +635,8 @@ bool MainWindow::loadConfig(const QString cfgfile, bool check_crash,
        ui->actionRemoteControl->setChecked(true);
     }
 
+    emit m_recent_config->configLoaded(m_settings->fileName());
+
     return conf_ok;
 }
 
@@ -663,6 +670,7 @@ bool MainWindow::saveConfig(const QString cfgfile)
 
     if (newfile == oldfile) {
         qDebug() << "New file is equal to old file => SYNCING...";
+        emit m_recent_config->configSaved(newfile);
         return true;
     }
 
@@ -2211,6 +2219,15 @@ void MainWindow::showSimpleTextFile(const QString &resource_path,
 
     delete dialog;
     // browser and layout deleted automatically
+}
+
+/**
+ * @brief Slot for handling loadConfig signals
+ * @param cfgfile
+ */
+void MainWindow::loadConfigSlot(const QString cfgfile)
+{
+    loadConfig(cfgfile, cfgfile != m_settings->fileName(), cfgfile != m_settings->fileName());
 }
 
 /**
