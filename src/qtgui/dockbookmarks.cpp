@@ -74,7 +74,7 @@ DockBookmarks::DockBookmarks(QWidget *parent) :
         this, SLOT(ShowContextMenu(const QPoint&)));
 
     // Update GUI
-    Bookmarks::Get().load();
+    Bookmarks::get().load();
     bookmarksTableModel->update();
 
     m_currentFrequency = 0;
@@ -89,9 +89,9 @@ DockBookmarks::DockBookmarks(QWidget *parent) :
             this, SLOT(doubleClicked(const QModelIndex &)));
     connect(bookmarksTableModel, SIGNAL(dataChanged(const QModelIndex &, const QModelIndex &)),
             this, SLOT(onDataChanged(const QModelIndex &, const QModelIndex &)));
-    connect(&Bookmarks::Get(), SIGNAL(TagListChanged()),
+    connect(&Bookmarks::get(), SIGNAL(TagListChanged()),
             ui->tableWidgetTagList, SLOT(updateTags()));
-    connect(&Bookmarks::Get(), SIGNAL(BookmarksChanged()),
+    connect(&Bookmarks::get(), SIGNAL(BookmarksChanged()),
             bookmarksTableModel, SLOT(update()));
 }
 
@@ -140,7 +140,7 @@ void DockBookmarks::updateBookmarks()
 void DockBookmarks::onDataChanged(const QModelIndex&, const QModelIndex &)
 {
     updateTags();
-    Bookmarks::Get().save();
+    Bookmarks::get().save();
 }
 
 void DockBookmarks::on_tableWidgetTagList_itemChanged(QTableWidgetItem *item)
@@ -153,7 +153,7 @@ void DockBookmarks::on_tableWidgetTagList_itemChanged(QTableWidgetItem *item)
         return;
 
     QString strText = item->text();
-    Bookmarks::Get().setTagChecked(strText, (item->checkState() == Qt::Checked));
+    Bookmarks::get().setTagChecked(strText, (item->checkState() == Qt::Checked));
 }
 
 bool DockBookmarks::eventFilter(QObject* object, QEvent* event)
@@ -181,7 +181,7 @@ bool DockBookmarks::DeleteSelectedBookmark()
     if (QMessageBox::question(this, "Delete bookmark", "Really delete?", QMessageBox::Yes | QMessageBox::No) == QMessageBox::Yes)
     {
         int iIndex = bookmarksTableModel->GetBookmarksIndexForRow(selected.first().row());
-        Bookmarks::Get().remove(iIndex);
+        Bookmarks::get().remove(iIndex);
         bookmarksTableModel->update();
     }
     return true;
@@ -236,7 +236,7 @@ void DockBookmarks::changeBookmarkTags(int row, int /*column*/)
     QString tags; // list of tags separated by comma
 
     int iIdx = bookmarksTableModel->GetBookmarksIndexForRow(row);
-    BookmarkInfo& bmi = Bookmarks::Get().getBookmark(iIdx);
+    BookmarkInfo& bmi = Bookmarks::get().getBookmark(iIdx);
 
     // Create and show the Dialog for a new Bookmark.
     // Write the result into variabe 'tags'.
@@ -269,13 +269,13 @@ void DockBookmarks::changeBookmarkTags(int row, int /*column*/)
             bmi.tags.clear();
             if (listTags.size() == 0)
             {
-                bmi.tags.append(&Bookmarks::Get().findOrAddTag("")); // "Untagged"
+                bmi.tags.append(&Bookmarks::get().findOrAddTag("")); // "Untagged"
             }
             for (int i = 0; i < listTags.size(); ++i)
             {
-                bmi.tags.append(&Bookmarks::Get().findOrAddTag(listTags[i]));
+                bmi.tags.append(&Bookmarks::get().findOrAddTag(listTags[i]));
             }
-            Bookmarks::Get().save();
+            Bookmarks::get().save();
         }
     }
 }
