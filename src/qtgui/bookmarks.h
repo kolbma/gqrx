@@ -54,6 +54,11 @@ struct TagInfo
     {
         return name < other.name;
     }
+
+    bool operator==(const TagInfo &other) const
+    {
+        return name == other.name;
+    }
 };
 
 struct BookmarkInfo
@@ -101,7 +106,7 @@ public:
     static void create();
     static Bookmarks &get();
 
-    void add(BookmarkInfo &info);
+    void add(const BookmarkInfo &info);
     void remove(int index);
     bool load();
     bool save();
@@ -112,12 +117,12 @@ public:
     //int upperBound(qint64 high);
 
     QList<TagInfo> getTagList() { return  QList<TagInfo>(m_TagList); }
-    TagInfo &findOrAddTag(QString tagName);
-    int getTagIndex(QString tagName);
-    bool removeTag(QString tagName);
-    bool setTagChecked(QString tagName, bool bChecked);
+    TagInfo &findOrAddTag(const QString &tagName);
+    int getTagIndex(const QString &tagName);
+    bool removeTag(const QString &tagName);
+    bool setTagChecked(const QString &tagName, bool bChecked);
 
-    void setConfigDir(const QString&);
+    void setConfigDir(const QString &cfg_dir);
 
 private:
     Bookmarks(); // Singleton Constructor is private.

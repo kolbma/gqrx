@@ -58,7 +58,7 @@ void Bookmarks::setConfigDir(const QString &cfg_dir)
 #endif
 }
 
-void Bookmarks::add(BookmarkInfo &info)
+void Bookmarks::add(const BookmarkInfo &info)
 {
     m_BookmarkList.append(info);
     std::stable_sort(m_BookmarkList.begin(), m_BookmarkList.end());
@@ -236,38 +236,34 @@ QList<BookmarkInfo> Bookmarks::getBookmarksInRange(qint64 low, qint64 high)
     }
 
     return found;
-
 }
 
-TagInfo &Bookmarks::findOrAddTag(QString tagName)
+TagInfo &Bookmarks::findOrAddTag(const QString &tagName)
 {
-    tagName = tagName.trimmed();
-
-    if (tagName.isEmpty())
-        tagName=TagInfo::UNTAGGED;
-
     int idx = getTagIndex(tagName);
-
-    if (idx != -1)
+    if (idx >= 0)
         return m_TagList[idx];
 
-    TagInfo info;
-    info.name = tagName;
+    auto trimTag = tagName.trimmed();
+
+    if (trimTag.isEmpty())
+        trimTag = TagInfo::UNTAGGED;
+
+    TagInfo info(trimTag);
     m_TagList.append(info);
     emit tagListChanged();
-    return m_TagList.last();
+
+    return m_TagList.last(); // TODO: race condition
 }
 
-bool Bookmarks::removeTag(QString tagName)
+bool Bookmarks::removeTag(const QString &tagName)
 {
-    tagName = tagName.trimmed();
-
-    // Do not delete "Untagged" tag.
-    if(tagName.compare(TagInfo::UNTAGGED, tagName) == 0)
+    int idx = getTagIndex(tagName);
+    if (idx < 0)
         return false;
 
-    int idx = getTagIndex(tagName);
-    if (idx == -1)
+    // Do not delete "Untagged" tag.
+    if(QString::compare(TagInfo::UNTAGGED, tagName.trimmed()) == 0)
         return false;
 
     // Delete Tag from all Bookmarks that use it.
@@ -297,31 +293,29 @@ bool Bookmarks::removeTag(QString tagName)
     return true;
 }
 
-bool Bookmarks::setTagChecked(QString tagName, bool bChecked)
+bool Bookmarks::setTagChecked(const QString &tagName, bool bChecked)
 {
     int idx = getTagIndex(tagName);
-    if (idx == -1) return false;
+    if (idx < 0)
+        return false;
+
     m_TagList[idx].active = bChecked;
+
     emit bookmarksChanged();
     emit tagListChanged();
     return true;
 }
 
-int Bookmarks::getTagIndex(QString tagName)
+int Bookmarks::getTagIndex(const QString &tagName)
 {
-    tagName = tagName.trimmed();
-    for (int i = 0; i < m_TagList.size(); i++)
-    {
-        if (m_TagList[i].name == tagName)
-            return i;
-    }
-
-    return -1;
+    if (tagName.isNull() || tagName.isEmpty())
+        return -1;
+    return m_TagList.indexOf(tagName.trimmed());
 }
 
 const QColor &BookmarkInfo::getColor() const
 {
-    for(int iTag=0; iTag < tags.size(); ++iTag)
+    for(int iTag = 0; iTag < tags.size(); ++iTag)
     {
         TagInfo &tag = *tags[iTag];
         if(tag.active)
@@ -333,7 +327,7 @@ const QColor &BookmarkInfo::getColor() const
 bool BookmarkInfo::isActive() const
 {
     bool bActive = false;
-    for(int iTag=0; iTag < tags.size(); ++iTag)
+    for(int iTag = 0; iTag < tags.size(); ++iTag)
     {
         TagInfo &tag = *tags[iTag];
         if(tag.active)
