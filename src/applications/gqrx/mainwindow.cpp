@@ -316,6 +316,9 @@ MainWindow::MainWindow(const QString cfgfile, bool edit_conf, QWidget *parent) :
     // restored because device probing might change the device configuration
     CIoConfig::getDeviceList(devList);
 
+    m_recent_config = new RecentConfig(m_cfg_dir, ui->menu_RecentConfig);
+    connect(m_recent_config, &RecentConfig::loadConfig, this, &MainWindow::loadConfigSlot);
+
     // restore last session
     if (!loadConfig(cfgfile, true, true))
     {
@@ -389,6 +392,8 @@ MainWindow::~MainWindow()
         m_settings->sync();
         delete m_settings;
     }
+
+    delete m_recent_config;
 
     delete iq_tool;
     delete ui;
@@ -652,6 +657,8 @@ bool MainWindow::loadConfig(const QString cfgfile, bool check_crash,
        ui->actionRemoteControl->setChecked(true);
     }
 
+    emit m_recent_config->configLoaded(m_settings->fileName());
+
     return conf_ok;
 }
 
@@ -664,7 +671,7 @@ bool MainWindow::loadConfig(const QString cfgfile, bool check_crash,
  * assumed to be the name of a file under m_cfg_dir.
  *
  * If cfgfile already exists it will be overwritten (we assume that a file
- * selection dialog has already asked for confirmation of overwrite.
+ * selection dialog has already asked for confirmation of overwrite).
  *
  * Since QSettings does not support "save as" we do this by copying the current
  * settings to a new file.
@@ -685,6 +692,7 @@ bool MainWindow::saveConfig(const QString cfgfile)
 
     if (newfile == oldfile) {
         qDebug() << "New file is equal to old file => SYNCING...";
+        emit m_recent_config->configSaved(newfile);
         return true;
     }
 
@@ -2366,6 +2374,15 @@ inline void MainWindow::activateFHFreq(const FreqHistoryEntry &fq_entry)
     }
 
      setNewFrequency(fq_entry.freq_hz);
+}
+
+/**
+ * @brief Slot for handling loadConfig signals
+ * @param cfgfile
+ */
+void MainWindow::loadConfigSlot(const QString cfgfile)
+{
+    loadConfig(cfgfile, cfgfile != m_settings->fileName(), cfgfile != m_settings->fileName());
 }
 
 /**
