@@ -319,7 +319,7 @@ int Bookmarks::getTagIndex(QString tagName)
     return -1;
 }
 
-const QColor BookmarkInfo::getColor() const
+const QColor &BookmarkInfo::getColor() const
 {
     for(int iTag=0; iTag < tags.size(); ++iTag)
     {

@@ -89,7 +89,7 @@ struct BookmarkInfo
     bool hasTags(QStringList _tags);
  */
 
-    const QColor getColor() const;
+    const QColor &getColor() const;
     bool isActive() const;
 };
 
