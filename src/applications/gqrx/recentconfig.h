@@ -39,7 +39,6 @@ public:
 
     /**
      * @brief Create actions in menu for recent config files
-     * @param menu
      */
     void createMenuActions();
 
