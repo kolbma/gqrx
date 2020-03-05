@@ -247,7 +247,7 @@ void DockBookmarks::changeBookmarkTags(int row, int /*column*/)
         BookmarksTagList* taglist = new BookmarksTagList(&dialog, false);
         taglist->updateTags();
         taglist->setSelectedTags(bmi.tags);
-        taglist->DeleteTag(TagInfo::strUntagged);
+        taglist->DeleteTag(TagInfo::UNTAGGED);
 
         QDialogButtonBox* buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok
                                               | QDialogButtonBox::Cancel);
