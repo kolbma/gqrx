@@ -92,6 +92,8 @@ VERSTR = '\\"$${VER}\\"'          # place quotes around the version string
 DEFINES += VERSION=\"$${VERSTR}\" # create a VERSION macro containing the version string
 
 SOURCES += \
+    src/applications/gqrx/freqhistory.cpp \
+    src/applications/gqrx/freqhistoryentry.cpp \
     src/applications/gqrx/main.cpp \
     src/applications/gqrx/mainwindow.cpp \
     src/applications/gqrx/receiver.cpp \
@@ -122,6 +124,7 @@ SOURCES += \
     src/qtgui/afsk1200win.cpp \
     src/qtgui/agc_options.cpp \
     src/qtgui/audio_options.cpp \
+    src/qtgui/bandplan.cpp \
     src/qtgui/bookmarks.cpp \
     src/qtgui/bookmarkstablemodel.cpp \
     src/qtgui/bookmarkstaglist.cpp \
@@ -145,6 +148,8 @@ SOURCES += \
     src/receivers/wfmrx.cpp
 
 HEADERS += \
+    src/applications/gqrx/freqhistory.h \
+    src/applications/gqrx/freqhistoryentry.h \
     src/applications/gqrx/gqrx.h \
     src/applications/gqrx/mainwindow.h \
     src/applications/gqrx/receiver.h \
@@ -181,6 +186,7 @@ HEADERS += \
     src/qtgui/afsk1200win.h \
     src/qtgui/agc_options.h \
     src/qtgui/audio_options.h \
+    src/qtgui/bandplan.h \
     src/qtgui/bookmarks.h \
     src/qtgui/bookmarkstablemodel.h \
     src/qtgui/bookmarkstaglist.h \

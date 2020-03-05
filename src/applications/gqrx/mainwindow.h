@@ -50,6 +50,8 @@
 #include "applications/gqrx/receiver.h"
 #endif
 
+#include "applications/gqrx/freqhistory.h"
+
 namespace Ui {
     class MainWindow;  /*! The main window UI */
 }
@@ -119,6 +121,8 @@ private:
 
     std::map<QString, QVariant> devList;
 
+    FreqHistory freq_history;
+
     // dummy widget to enforce linking to QtSvg
     QSvgWidget      *qsvg_dummy;
 
@@ -128,6 +132,8 @@ private:
     void updateGainStages(bool read_from_device);
     void showSimpleTextFile(const QString &resource_path,
                             const QString &window_title);
+    inline void getBandwidthLimits(int bandwidth, int *lo, int *hi);
+    inline void activateFHFreq(const FreqHistoryEntry &fq_entry);
 
 private slots:
     /* RecentConfig */
@@ -223,7 +229,8 @@ private slots:
     void on_actionAbout_triggered();
     void on_actionAboutQt_triggered();
     void on_actionAddBookmark_triggered();
-
+    void on_actionFHBack_triggered();
+    void on_actionFHForward_triggered();
 
     /* window close signals */
     void afsk1200win_closed();
@@ -235,6 +242,16 @@ private slots:
     void iqFftTimeout();
     void audioFftTimeout();
     void rdsTimeout();
+
+    /* frequency history */
+    void setFHFrequency(qint64 freq_hz);
+    void setFHFreqOffset(qint64 freq_hz);
+    void setFHDemod(int index);
+    void setFHSquelch(double db_level);
+    void setFHFilterFreq(int low, int high);
+    void setFHFilterBand(int bandwidth);
+    void on_FHFirst(bool is_first);
+    void on_FHLast(bool is_last);
 };
 
 #endif // MAINWINDOW_H

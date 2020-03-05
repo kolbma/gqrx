@@ -56,6 +56,7 @@
 #include "remote_control_settings.h"
 
 #include "qtgui/bookmarkstaglist.h"
+#include "qtgui/bandplan.h"
 
 MainWindow::MainWindow(const QString cfgfile, bool edit_conf, QWidget *parent) :
     QMainWindow(parent),
@@ -68,6 +69,7 @@ MainWindow::MainWindow(const QString cfgfile, bool edit_conf, QWidget *parent) :
     dec_afsk1200(0)
 {
     ui->setupUi(this);
+    BandPlan::create();
     Bookmarks::create();
 
     /* Initialise default configuration directory */
@@ -127,7 +129,9 @@ MainWindow::MainWindow(const QString cfgfile, bool edit_conf, QWidget *parent) :
     uiDockAudio = new DockAudio();
     uiDockInputCtl = new DockInputCtl();
     uiDockFft = new DockFft();
+    BandPlan::Get().setConfigDir(m_cfg_dir);
     Bookmarks::Get().setConfigDir(m_cfg_dir);
+    BandPlan::Get().load();
     uiDockBookmarks = new DockBookmarks(this);
 
     // setup some toggle view shortcuts
@@ -235,6 +239,7 @@ MainWindow::MainWindow(const QString cfgfile, bool edit_conf, QWidget *parent) :
     connect(uiDockFft, SIGNAL(resetFftZoom()), ui->plotter, SLOT(resetHorizontalZoom()));
     connect(uiDockFft, SIGNAL(gotoFftCenter()), ui->plotter, SLOT(moveToCenterFreq()));
     connect(uiDockFft, SIGNAL(gotoDemodFreq()), ui->plotter, SLOT(moveToDemodFreq()));
+    connect(uiDockFft, SIGNAL(bandPlanChanged(bool)), ui->plotter, SLOT(toggleBandPlan(bool)));
     connect(uiDockFft, SIGNAL(wfColormapChanged(const QString)), ui->plotter, SLOT(setWfColormap(const QString)));
     connect(uiDockFft, SIGNAL(wfColormapChanged(const QString)), uiDockAudio, SLOT(setWfColormap(const QString)));
 
@@ -258,6 +263,20 @@ MainWindow::MainWindow(const QString cfgfile, bool edit_conf, QWidget *parent) :
     connect(uiDockBookmarks, SIGNAL(newBookmarkActivated(qint64, QString, int)), this, SLOT(onBookmarkActivated(qint64, QString, int)));
     connect(uiDockBookmarks->actionAddBookmark, SIGNAL(triggered()), this, SLOT(on_actionAddBookmark_triggered()));
 
+    // FrequencyHistory
+    connect(&freq_history, &FreqHistory::history_first, this, &MainWindow::on_FHFirst);
+    connect(&freq_history, &FreqHistory::history_last, this, &MainWindow::on_FHLast);
+    connect(ui->freqCtrl, SIGNAL(newFrequency(qint64)), this, SLOT(setFHFrequency(qint64)));
+    connect(uiDockRxOpt, SIGNAL(rxFreqChanged(qint64)), ui->freqCtrl, SLOT(setFHFrequency(qint64)));
+    connect(uiDockRxOpt, SIGNAL(filterOffsetChanged(qint64)), this, SLOT(setFHFreqOffset(qint64)));
+    connect(uiDockRxOpt, SIGNAL(demodSelected(int)), this, SLOT(setFHDemod(int)));
+    connect(uiDockRxOpt, SIGNAL(sqlLevelChanged(double)), this, SLOT(setFHSquelch(double)));
+    connect(remote, SIGNAL(newFrequency(qint64)), ui->freqCtrl, SLOT(setFHFrequency(qint64)));
+    connect(remote, SIGNAL(newFilterOffset(qint64)), this, SLOT(setFHFreqOffset(qint64)));
+    connect(remote, SIGNAL(newMode(int)), this, SLOT(setFHDemod(int)));
+    connect(remote, SIGNAL(newSquelchLevel(double)), this, SLOT(setFHSquelch(double)));
+    connect(ui->plotter, SIGNAL(newFilterFreq(int, int)), remote, SLOT(setFHFilterFreq(int, int)));
+    connect(remote, SIGNAL(newPassband(int)), this, SLOT(setFHFilterBand(int)));
 
     // I/Q playback
     connect(iq_tool, SIGNAL(startRecording(QString)), this, SLOT(startIqRecording(QString)));
@@ -329,6 +348,9 @@ MainWindow::MainWindow(const QString cfgfile, bool edit_conf, QWidget *parent) :
             configOk = true;
         }
     }
+
+    ui->actionFHBack->setEnabled(!freq_history.is_first());
+    ui->actionFHForward->setEnabled(!freq_history.is_last());
 
     qsvg_dummy = new QSvgWidget();
 }
@@ -838,6 +860,97 @@ void MainWindow::setNewFrequency(qint64 rx_freq)
     uiDockRxOpt->setHwFreq(d_hw_freq);
     ui->freqCtrl->setFrequency(rx_freq);
     uiDockBookmarks->setNewFrequency(rx_freq);
+}
+
+/**
+ * @brief Slot for handling FreqHistory on frequency change
+ * @param freq_hz
+ */
+void MainWindow::setFHFrequency(qint64 freq_hz)
+{
+    FreqHistoryEntry fq_entry;
+    freq_history.get_entry(freq_history.position(), fq_entry);
+
+    if (fq_entry.freq_hz != freq_hz)
+    {
+        /* no overwrite of cache with current ui values */
+        fq_entry.freq_hz = freq_hz;
+        fq_entry.demod = static_cast<DockRxOpt::rxopt_mode_idx>(uiDockRxOpt->currentDemod());
+        fq_entry.offset_freq_hz = rx->get_filter_offset();
+        fq_entry.squelch = uiDockRxOpt->currentSquelchLevel();
+        fq_entry.filter = uiDockRxOpt->currentFilter();
+        fq_entry.filter_bw = ui->plotter->getFilterBw();
+        fq_entry.filter_shape = uiDockRxOpt->currentFilterShape();
+        ui->plotter->getHiLowCutFrequencies(&fq_entry.min_hz, &fq_entry.max_hz);
+        freq_history.try_make_entry(fq_entry);
+    }
+}
+
+/**
+ * @brief Slot for handling FreqHistory on frequency offset change
+ * @param freq_hz
+ */
+void MainWindow::setFHFreqOffset(qint64 freq_hz)
+{
+    freq_history.set_offset_freq(ui->freqCtrl->getFrequency(), freq_hz);
+}
+
+/**
+ * @brief Slot for handling FreqHistory on demod change
+ * @param index of demod
+ */
+void MainWindow::setFHDemod(int index)
+{
+    int lo, hi;
+    auto bandwidth = ui->plotter->getFilterBw();
+
+    getBandwidthLimits(bandwidth, &lo, &hi);
+
+    const auto freq = ui->freqCtrl->getFrequency();
+    freq_history.set_demod(freq, static_cast<DockRxOpt::rxopt_mode_idx>(index));
+    freq_history.set_filter(freq, uiDockRxOpt->currentFilter());
+    freq_history.set_filter_bw(freq, bandwidth);
+    freq_history.set_filter_freq(freq, lo, hi);
+    freq_history.set_filter_shape(freq, uiDockRxOpt->currentFilterShape());
+}
+
+/**
+ * @brief Slot for handling FreqHistory on squelch level change
+ * @param db_level
+ */
+void MainWindow::setFHSquelch(double db_level)
+{
+    freq_history.set_squelch(ui->freqCtrl->getFrequency(), db_level);
+}
+
+/**
+ * @brief Slot for handling FreqHistory on filter freq change
+ * @param low
+ * @param high
+ */
+void MainWindow::setFHFilterFreq(int low, int high)
+{
+    const auto freq = ui->freqCtrl->getFrequency();
+    freq_history.set_filter(freq, uiDockRxOpt->currentFilter());
+    freq_history.set_filter_bw(freq, ui->plotter->getFilterBw());
+    freq_history.set_filter_freq(freq, low, high);
+    freq_history.set_filter_shape(freq, uiDockRxOpt->currentFilterShape());
+}
+
+/**
+ * @brief Slot for handling FreqHistory on filter freq change
+ * @param bandwidth
+ */
+void MainWindow::setFHFilterBand(int bandwidth)
+{
+    int lo, hi;
+    getBandwidthLimits(bandwidth, &lo, &hi);
+
+    const auto freq = ui->freqCtrl->getFrequency();
+    freq_history.set_filter(freq, uiDockRxOpt->currentFilter());
+    freq_history.set_filter_bw(freq, bandwidth);
+    freq_history.set_filter_freq(freq, lo, hi);
+    freq_history.set_filter_shape(freq, uiDockRxOpt->currentFilterShape());
 }
 
 /**
@@ -2094,52 +2207,16 @@ void MainWindow::onBookmarkActivated(qint64 freq, QString demod, int bandwidth)
     setNewFrequency(freq);
     selectDemod(demod);
 
-    /* Check if filter is symmetric or not by checking the presets */
-    int mode = uiDockRxOpt->currentDemod();
-    int preset = uiDockRxOpt->currentFilterShape();
-
     int lo, hi;
-    uiDockRxOpt->getFilterPreset(mode, preset, &lo, &hi);
-
-    if(lo + hi == 0)
-    {
-        lo = -bandwidth / 2;
-        hi =  bandwidth / 2;
-    }
-    else if(lo >= 0 && hi >= 0)
-    {
-        hi = lo + bandwidth;
-    }
-    else if(lo <= 0 && hi <= 0)
-    {
-        lo = hi - bandwidth;
-    }
+    getBandwidthLimits(bandwidth, &lo, &hi);
 
     on_plotter_newFilterFreq(lo, hi);
 }
 
 void MainWindow::setPassband(int bandwidth)
 {
-    /* Check if filter is symmetric or not by checking the presets */
-    int mode = uiDockRxOpt->currentDemod();
-    int preset = uiDockRxOpt->currentFilterShape();
-
     int lo, hi;
-    uiDockRxOpt->getFilterPreset(mode, preset, &lo, &hi);
-
-    if(lo + hi == 0)
-    {
-        lo = -bandwidth / 2;
-        hi =  bandwidth / 2;
-    }
-    else if(lo >= 0 && hi >= 0)
-    {
-        hi = lo + bandwidth;
-    }
-    else if(lo <= 0 && hi <= 0)
-    {
-        lo = hi - bandwidth;
-    }
+    getBandwidthLimits(bandwidth, &lo, &hi);
 
     remote->setPassband(lo, hi);
 
@@ -2219,6 +2296,84 @@ void MainWindow::showSimpleTextFile(const QString &resource_path,
 
     delete dialog;
     // browser and layout deleted automatically
+}
+
+/**
+ * @brief Calculates low and high limits from specified bandwidth
+ * @param bandwidth
+ * @param lo
+ * @param hi
+ */
+inline void MainWindow::getBandwidthLimits(int bandwidth, int *lo, int *hi)
+{
+    /* Check if filter is symmetric or not by checking the presets */
+    int mode = uiDockRxOpt->currentDemod();
+    int preset = uiDockRxOpt->currentFilter();
+
+    uiDockRxOpt->getFilterPreset(mode, preset, lo, hi);
+
+    if(*lo + *hi == 0)
+    {
+        *lo = -bandwidth / 2;
+        *hi =  bandwidth / 2;
+    }
+    else if(*lo >= 0 && *hi >= 0)
+    {
+        *hi = *lo + bandwidth;
+    }
+    else if(*lo <= 0 && *hi <= 0)
+    {
+        *lo = *hi - bandwidth;
+    }
+}
+
+/**
+ * @brief activates FrequencyHistory entry
+ * @param fq_entry
+ */
+inline void MainWindow::activateFHFreq(const FreqHistoryEntry &fq_entry)
+{
+    bool need_demod = false;
+
+    if (uiDockRxOpt->currentFilterShape() != fq_entry.filter_shape)
+    {
+        uiDockRxOpt->setCurrentFilterShape(fq_entry.filter_shape);
+        need_demod = true;
+    }
+
+    if (uiDockRxOpt->currentFilter() != fq_entry.filter)
+    {
+        uiDockRxOpt->setCurrentFilter(fq_entry.filter);
+        need_demod = true;
+    }
+
+    if (uiDockRxOpt->currentSquelchLevel() != fq_entry.squelch)
+    {
+        uiDockRxOpt->setSquelchLevel(fq_entry.squelch);
+        setSqlLevel(fq_entry.squelch);
+    }
+
+    if (need_demod || static_cast<DockRxOpt::rxopt_mode_idx>(uiDockRxOpt->currentDemod()) != fq_entry.demod)
+    {
+        // set shape to normal to stay on center freq
+        uiDockRxOpt->setCurrentFilterShape(receiver::filter_shape::FILTER_SHAPE_NORMAL);
+        selectDemod(fq_entry.demod); // needs squelch, sets hi/low based on filtershape
+        uiDockRxOpt->setCurrentFilterShape(fq_entry.filter_shape);
+    }
+
+    int lo, hi;
+    ui->plotter->getHiLowCutFrequencies(&lo, &hi);
+    if (lo != fq_entry.min_hz || hi != fq_entry.max_hz)
+    {
+        uiDockRxOpt->setFilterParam(fq_entry.min_hz, fq_entry.max_hz); // needs mode
+    }
+
+    if (rx->get_filter_offset() != fq_entry.offset_freq_hz)
+    {
+        setFilterOffset(fq_entry.offset_freq_hz); // sets freq based on hw freq, lnb and offset
+    }
+
+     setNewFrequency(fq_entry.freq_hz);
 }
 
 /**
@@ -2342,4 +2497,46 @@ void MainWindow::on_actionAddBookmark_triggered()
         uiDockBookmarks->updateBookmarks();
         ui->plotter->updateOverlay();
     }
+}
+
+/**
+ * @brief Called by Frequency History back action
+ */
+void MainWindow::on_actionFHBack_triggered()
+{
+    FreqHistoryEntry fq_entry;
+
+    if (freq_history.back(fq_entry))
+    {
+        activateFHFreq(fq_entry);
+    }
+}
+
+/**
+ * @brief Called by Frequency History forward action
+ */
+void MainWindow::on_actionFHForward_triggered()
+{
+    FreqHistoryEntry fq_entry;
+
+    if (freq_history.forward(fq_entry))
+    {
+        activateFHFreq(fq_entry);
+    }
+}
+
+/**
+ * @brief handler for FreqHistory::history_first
+ */
+void MainWindow::on_FHFirst(bool is_first)
+{
+    ui->actionFHBack->setEnabled(!is_first);
+}
+
+/**
+ * @brief handler for FreqHistory::history_first
+ */
+void MainWindow::on_FHLast(bool is_last)
+{
+    ui->actionFHForward->setEnabled(!is_last);
 }
