@@ -137,7 +137,7 @@ private:
 
 private slots:
     /* RecentConfig */
-    void loadConfigSlot(const QString cfgfile);
+    void loadConfigSlot(const QString &cfgfile);
 
     /* rf */
     void setLnbLo(double freq_mhz);

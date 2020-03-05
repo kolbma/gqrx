@@ -2391,7 +2391,7 @@ inline void MainWindow::activateFHFreq(const FreqHistoryEntry &fq_entry)
  * @brief Slot for handling loadConfig signals
  * @param cfgfile
  */
-void MainWindow::loadConfigSlot(const QString cfgfile)
+void MainWindow::loadConfigSlot(const QString &cfgfile)
 {
     loadConfig(cfgfile, cfgfile != m_settings->fileName(), cfgfile != m_settings->fileName());
 }
