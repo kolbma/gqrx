@@ -38,7 +38,6 @@ public:
     void setCenterLineEnabled(bool enabled) { m_CenterLineEnabled = enabled; }
     void setTooltipsEnabled(bool enabled) { m_TooltipsEnabled = enabled; }
     void setBookmarksEnabled(bool enabled) { m_BookmarksEnabled = enabled; }
-    void setBandPlanEnabled(bool enabled) { m_BandPlanEnabled = enabled; }
 
     void setNewFftData(float *fftData, int size);
     void setNewFftData(float *fftData, float *wfData, int size);
@@ -147,7 +146,6 @@ public slots:
     void setPandapterRange(float min, float max);
     void setWaterfallRange(float min, float max);
     void setPeakDetection(bool enabled, float c);
-    void toggleBandPlan(bool state);
     void updateOverlay();
 
     void setPercent2DScreen(int percent)
@@ -225,8 +223,7 @@ private:
     qint64      m_FreqPerDiv;
     bool        m_CenterLineEnabled;  /*!< Distinguish center line. */
     bool        m_FilterBoxEnabled;   /*!< Draw filter box. */
-    bool        m_TooltipsEnabled;    /*!< Tooltips enabled */
-    bool        m_BandPlanEnabled;    /*!< Show/hide band plan on spectrum */
+    bool        m_TooltipsEnabled;     /*!< Tooltips enabled */
     bool        m_BookmarksEnabled;   /*!< Show/hide bookmarks on spectrum */
     int         m_DemodHiCutFreq;
     int         m_DemodLowCutFreq;
