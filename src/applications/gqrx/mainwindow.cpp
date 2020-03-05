@@ -440,7 +440,12 @@ bool MainWindow::loadConfig(const QString cfgfile, bool check_crash,
     qDebug() << "Loading configuration from:" << cfgfile;
 
     if (m_settings)
+    {
+        // set current config to not crashed before loading new config
+        m_settings->setValue("crashed", false);
+        m_settings->sync();
         delete m_settings;
+    }
 
     if (QDir::isAbsolutePath(cfgfile))
         m_settings = new QSettings(cfgfile, QSettings::IniFormat);
@@ -706,10 +711,6 @@ bool MainWindow::saveConfig(const QString cfgfile)
     }
     if (QFile::copy(oldfile, newfile))
     {
-        // ensure that old config has crash cleared
-        m_settings->setValue("crashed", false);
-        m_settings->sync();
-
         loadConfig(cfgfile, false, false);
         return true;
     }
