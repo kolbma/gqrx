@@ -82,9 +82,9 @@ void RecentConfig::createMenuActions()
 
         // QAction deleted by clear above
         QAction *action = new QAction(nr + " " + (fname.length() > MENU_FILENAME_LEN ?
-                                                      fname.left(MENU_FILENAME_LEN) + "..." : fname));
+                                                      fname.left(MENU_FILENAME_LEN) + "..." : fname),
+                                      menu);
         action->setStatusTip("Load settings from config file " + file->canonicalFilePath());
-        action->setParent(menu);
         action->setData(i);
         connect(action, &QAction::triggered, this, [=](bool) { onMenuAction(i); });
         menu->addAction(action);
@@ -113,13 +113,22 @@ bool RecentConfig::loadRecentConfig()
     while (!s.atEnd())
     {
         QString buf;
+#if (QT_VERSION >= QT_VERSION_CHECK(5, 5, 0))
         if (!s.readLineInto(&buf, 33000))
         {
             file.close();
             cfgfiles->clear();
             return false;
         }
-
+#else
+        buf = s.readLine(33000);
+        if (buf.isNull())
+        {
+            file.close();
+            cfgfiles->clear();
+            return false;
+        }
+#endif
         if (!buf.isEmpty())
         {
             const auto fi = QFileInfo(buf);
@@ -173,7 +182,15 @@ inline void RecentConfig::updateFiles(const QString &filename)
     if (!file.exists())
         return;
 
+#if (QT_VERSION >= QT_VERSION_CHECK(5, 4, 0))
     cfgfiles->removeOne(file);
+#else
+    const int i = cfgfiles->indexOf(file);
+    if (i >= 0)
+    {
+        cfgfiles->removeAt(i);
+    }
+#endif
     cfgfiles->prepend(file);
     if (cfgfiles->count() > MENU_MAX_ENTRIES)
     {
@@ -185,9 +202,10 @@ void RecentConfig::onMenuAction(int index) const
 {
     if (cfgfiles->count() > index)
     {
-        emit loadConfig(cfgfiles->at(index).canonicalFilePath());
+        const auto fname = cfgfiles->at(index).canonicalFilePath();
+        emit loadConfig(fname);
 #ifndef QT_NO_DEBUG_OUTPUT
-        qDebug() << "Emitted loadConfig(" << cfgfiles->at(index).canonicalFilePath() << ")";
+        qDebug() << "Emitted loadConfig(" << fname << ")";
 #endif
     }
 }
