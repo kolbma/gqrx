@@ -86,7 +86,7 @@ void RecentConfig::createMenuActions()
         action->setStatusTip("Load settings from config file " + file->canonicalFilePath());
         action->setParent(menu);
         action->setData(i);
-        connect(action, &QAction::triggered, this, [=]() { onMenuAction(i); });
+        connect(action, &QAction::triggered, this, [=](bool) { onMenuAction(i); });
         menu->addAction(action);
     }
 }
