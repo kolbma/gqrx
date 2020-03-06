@@ -19,7 +19,7 @@
   <property name="minimumSize">
    <size>
     <width>322</width>
-    <height>117</height>
+    <height>120</height>
    </size>
   </property>
   <property name="allowedAreas">
@@ -55,8 +55,14 @@
         <bool>true</bool>
        </property>
        <property name="sortingEnabled">
-        <bool>false</bool>
+        <bool>true</bool>
        </property>
+       <attribute name="horizontalHeaderVisible">
+        <bool>true</bool>
+       </attribute>
+       <attribute name="horizontalHeaderStretchLastSection">
+        <bool>true</bool>
+       </attribute>
       </widget>
       <widget class="BookmarksTagList" name="tableWidgetTagList">
        <property name="sizePolicy">
@@ -95,17 +101,20 @@
        <property name="selectionBehavior">
         <enum>QAbstractItemView::SelectRows</enum>
        </property>
+       <property name="sortingEnabled">
+        <bool>true</bool>
+       </property>
        <property name="columnCount">
         <number>2</number>
        </property>
        <attribute name="horizontalHeaderVisible">
-        <bool>false</bool>
-       </attribute>
-       <attribute name="horizontalHeaderDefaultSectionSize">
-        <number>30</number>
+        <bool>true</bool>
        </attribute>
        <attribute name="horizontalHeaderMinimumSectionSize">
         <number>18</number>
+       </attribute>
+       <attribute name="horizontalHeaderDefaultSectionSize">
+        <number>30</number>
        </attribute>
        <attribute name="horizontalHeaderStretchLastSection">
         <bool>true</bool>
