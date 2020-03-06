@@ -144,7 +144,7 @@ public:
      * @param tagName (need not to be trimmed)
      * @return  TagInfo&
      */
-    const TagInfo &findOrAddTag(const QString &tagName);
+    TagInfo &findOrAddTag(const QString &tagName);
 
     /**
      * @brief get pointer to TagInfo by tagName

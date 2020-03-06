@@ -390,7 +390,7 @@ QList<BookmarkInfo> Bookmarks::getBookmarksInRange(qint64 low, qint64 high)
     return found;
 }
 
-const TagInfo &Bookmarks::findOrAddTag(const QString &tagName)
+TagInfo &Bookmarks::findOrAddTag(const QString &tagName)
 {
     int idx = getTagIndex(tagName);
     if (idx >= 0)
@@ -411,6 +411,7 @@ const TagInfo &Bookmarks::findOrAddTag(const QString &tagName)
 
 void Bookmarks::getTagInfo(const TagInfo *tagInfo, const QString &tagName) const
 {
+    (void)tagInfo; // unused warning?
     tagInfo = nullptr;
     if (tagName.isNull() || tagName.isEmpty())
         return;
