@@ -4,6 +4,7 @@
  *           http://gqrx.dk/
  *
  * Copyright 2013 Christian Lindner DL2VCL, Stefano Leucci.
+ * Copyright 2020 Markus Kolb
  *
  * Gqrx is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -102,34 +103,107 @@ class Bookmarks : public QObject
 {
     Q_OBJECT
 public:
+    static const QChar CSV_QUOTE;
+    static const QString CSV_SEPARATOR;
+    static const QString CSV_SEPARATOR2;
+    static const QString TAG_SEPARATOR;
+
     // This is a Singleton Class now because you can not send qt-signals from static functions.
     static void create();
     static Bookmarks &get();
 
     void add(const BookmarkInfo &info);
     void remove(int index);
+
+    /**
+     * @brief Loads special formatted data with semikolon and comma separator
+     * @details should enable all chars in the data, only combination "; gets replaced with "_
+     * @see csvsplit()
+     * @return true on success
+     */
     bool load();
+
+    /**
+     * @brief Safe save with temporary file, backup and replacement
+     * @details does quoting of separator chars for some text fields
+     * @see csvquote()
+     * @return true on success
+     */
     bool save();
-    int size() { return m_BookmarkList.size(); }
-    BookmarkInfo &getBookmark(int i) { return m_BookmarkList[i]; }
+
+    int size() { return m_bookmarkList.size(); }
+    BookmarkInfo &getBookmark(int i) { return m_bookmarkList[i]; }
     QList<BookmarkInfo> getBookmarksInRange(qint64 low, qint64 high);
     //int lowerBound(qint64 low);
     //int upperBound(qint64 high);
 
-    QList<TagInfo> getTagList() { return  QList<TagInfo>(m_TagList); }
-    TagInfo &findOrAddTag(const QString &tagName);
+    QList<TagInfo> getTagList() { return  QList<TagInfo>(m_tagList); }
+
+    /**
+     * @brief find or add a tag with internal trimmed tagName
+     * @param tagName (need not to be trimmed)
+     * @return  TagInfo&
+     */
+    const TagInfo &findOrAddTag(const QString &tagName);
+
+    /**
+     * @brief get pointer to TagInfo by tagName
+     * @param tagInfo to retrieve
+     * @param tagName (need not to be trimmed)
+     * @return
+     */
+    void getTagInfo(const TagInfo *tagInfo, const QString &tagName) const;
+
+    /**
+     * @brief get index for internal trimmed tagName
+     * @param tagName (need not to be trimmed)
+     * @return int index
+     */
     int getTagIndex(const QString &tagName);
+
+    /**
+     * @brief remove tag for internal trimmed tagName
+     * @param tagName (need not to be trimmed)
+     * @return true on success
+     */
     bool removeTag(const QString &tagName);
-    bool setTagChecked(const QString &tagName, bool bChecked);
+
+    /**
+     * @brief set active state of tag
+     * @param tagName
+     * @param is_active
+     * @return true if tag found and set, else false
+     */
+    bool setTagActive(const QString &tagName, bool is_active);
 
     void setConfigDir(const QString &cfg_dir);
 
 private:
+    static Bookmarks    *m_pThis;
+
+    /**
+     * @brief Decides if quoting is needed and returns a safe string
+     * @param unquoted
+     * @param minlength for leftJustify
+     * @return a safe and perhaps quoted string
+     */
+    static QString csvquote(const QString &unquoted, int minlength = 0);
+
+    /**
+     * @brief Splits up text at separator and checks for fieldCount
+     * @details Handles quoted fields, but field must be quoted till the end and the next char is the separator
+     * @param text
+     * @param fieldCount check if > 0
+     * @param separator a seperator char like , or ;
+     * @return empty list if fieldCount does not match, filled list on success
+     */
+    static QStringList csvsplit(const QString &text, int fieldCount, const QString &separator = CSV_SEPARATOR);
+
+    QList<BookmarkInfo>  m_bookmarkList;
+    QList<TagInfo>       m_tagList;
+    QString              m_bookmarksFile;
+
     Bookmarks(); // Singleton Constructor is private.
-    QList<BookmarkInfo> m_BookmarkList;
-    QList<TagInfo> m_TagList;
-    QString        m_bookmarksFile;
-    static Bookmarks *m_pThis;
 
 signals:
     void bookmarksChanged(void);
