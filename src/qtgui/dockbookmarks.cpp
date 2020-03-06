@@ -153,7 +153,7 @@ void DockBookmarks::on_tableWidgetTagList_itemChanged(QTableWidgetItem *item)
         return;
 
     QString strText = item->text();
-    Bookmarks::get().setTagChecked(strText, (item->checkState() == Qt::Checked));
+    Bookmarks::get().setTagActive(strText, (item->checkState() == Qt::Checked));
 }
 
 bool DockBookmarks::eventFilter(QObject* object, QEvent* event)
