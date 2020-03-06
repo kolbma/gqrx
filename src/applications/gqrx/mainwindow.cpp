@@ -127,7 +127,7 @@ MainWindow::MainWindow(const QString cfgfile, bool edit_conf, QWidget *parent) :
     uiDockAudio = new DockAudio();
     uiDockInputCtl = new DockInputCtl();
     uiDockFft = new DockFft();
-    Bookmarks::get().setConfigDir(m_cfg_dir);
+    Bookmarks::instance().setConfigDir(m_cfg_dir);
     uiDockBookmarks = new DockBookmarks(this);
 
     // setup some toggle view shortcuts
@@ -2314,13 +2314,13 @@ void MainWindow::on_actionAddBookmark_triggered()
         QStringList listTags = tags.split(",",QString::SkipEmptyParts);
         info.tags.clear();
         if (listTags.size() == 0)
-            info.tags.append(&Bookmarks::get().findOrAddTag(""));
+            info.tags.append(&Bookmarks::instance().findOrAddTag(""));
 
 
         for (i = 0; i < listTags.size(); ++i)
-            info.tags.append(&Bookmarks::get().findOrAddTag(listTags[i]));
+            info.tags.append(&Bookmarks::instance().findOrAddTag(listTags[i]));
 
-        Bookmarks::get().add(info);
+        Bookmarks::instance().add(info);
         uiDockBookmarks->updateTags();
         uiDockBookmarks->updateBookmarks();
         ui->plotter->updateOverlay();

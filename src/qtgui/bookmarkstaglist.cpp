@@ -65,7 +65,7 @@ void BookmarksTagList::on_cellClicked(int row, int column)
 
 void BookmarksTagList::changeColor(int row, int column)
 {
-    TagInfo &info = Bookmarks::get().findOrAddTag(item(row, 1)->text());
+    TagInfo &info = Bookmarks::instance().findOrAddTag(item(row, 1)->text());
     QColor color = QColorDialog::getColor(info.color, this);
 
     if(!color.isValid())
@@ -73,7 +73,7 @@ void BookmarksTagList::changeColor(int row, int column)
 
     info.color = color;
     updateTags();
-    Bookmarks::get().save();
+    Bookmarks::instance().save();
 }
 
 void BookmarksTagList::toggleCheckedState(int row, int column)
@@ -98,7 +98,7 @@ void BookmarksTagList::updateTags()
     }
 
     // Get current List of Tags.
-    QList<TagInfo> newTags = Bookmarks::get().getTagList();
+    QList<TagInfo> newTags = Bookmarks::instance().getTagList();
     if(!m_bShowUntagged)
     {
         for(int i=0; i < newTags.size(); ++i)
@@ -287,7 +287,7 @@ void BookmarksTagList::DeleteSelectedTag()
 
 void BookmarksTagList::DeleteTag(const QString &name)
 {
-    Bookmarks::get().removeTag(name);
+    Bookmarks::instance().removeTag(name);
     updateTags();
 }
 

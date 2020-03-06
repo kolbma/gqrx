@@ -56,7 +56,7 @@ void Bookmarks::create()
     m_pThis = new Bookmarks;
 }
 
-Bookmarks &Bookmarks::get()
+Bookmarks &Bookmarks::instance()
 {
     return *m_pThis;
 }

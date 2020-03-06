@@ -152,7 +152,7 @@ bool BookmarksTableModel::setData(const QModelIndex &index, const QVariant &valu
                 for(int i=0; i < strList.size(); ++i)
                 {
                     QString strTag = strList[i].trimmed();
-                    info.tags.append(&Bookmarks::get().findOrAddTag(strTag));
+                    info.tags.append(&Bookmarks::instance().findOrAddTag(strTag));
                 }
                 emit dataChanged(index, index);
                 return true;
@@ -187,9 +187,9 @@ void BookmarksTableModel::update()
 {
     int iRow = 0;
     m_Bookmarks.clear();
-    for(int iBookmark = 0; iBookmark < Bookmarks::get().size(); iBookmark++)
+    for(int iBookmark = 0; iBookmark < Bookmarks::instance().size(); iBookmark++)
     {
-        BookmarkInfo &info = Bookmarks::get().getBookmark(iBookmark);
+        BookmarkInfo &info = Bookmarks::instance().getBookmark(iBookmark);
 
         bool bActive = false;
         for(int iTag = 0; iTag < info.tags.size(); ++iTag)

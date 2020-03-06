@@ -110,7 +110,7 @@ public:
 
     // This is a Singleton Class now because you can not send qt-signals from static functions.
     static void create();
-    static Bookmarks &get();
+    static Bookmarks &instance();
 
     void add(const BookmarkInfo &info);
     void remove(int index);
