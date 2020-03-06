@@ -68,7 +68,6 @@ MainWindow::MainWindow(const QString cfgfile, bool edit_conf, QWidget *parent) :
     dec_afsk1200(0)
 {
     ui->setupUi(this);
-    Bookmarks::create();
 
     /* Initialise default configuration directory */
     QByteArray xdg_dir = qgetenv("XDG_CONFIG_HOME");

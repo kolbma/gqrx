@@ -43,22 +43,17 @@ const QChar Bookmarks::CSV_QUOTE('"');
 const QString Bookmarks::CSV_SEPARATOR(";");
 const QString Bookmarks::CSV_SEPARATOR2("; ");
 const QString Bookmarks::TAG_SEPARATOR(",");
-Bookmarks *Bookmarks::m_pThis = 0;
+
+Bookmarks &Bookmarks::instance()
+{
+    static Bookmarks singleton;
+    return singleton;
+}
 
 Bookmarks::Bookmarks()
 {
      TagInfo tag(TagInfo::UNTAGGED);
      m_tagList.append(tag);
-}
-
-void Bookmarks::create()
-{
-    m_pThis = new Bookmarks;
-}
-
-Bookmarks &Bookmarks::instance()
-{
-    return *m_pThis;
 }
 
 void Bookmarks::setConfigDir(const QString &cfg_dir)

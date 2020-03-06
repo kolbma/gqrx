@@ -108,8 +108,10 @@ public:
     static const QString CSV_SEPARATOR2;
     static const QString TAG_SEPARATOR;
 
-    // This is a Singleton Class now because you can not send qt-signals from static functions.
-    static void create();
+    /**
+     * @brief lazy loaded singleton instance of Bookmarks
+     * @return
+     */
     static Bookmarks &instance();
 
     void add(const BookmarkInfo &info);
@@ -179,8 +181,6 @@ public:
     void setConfigDir(const QString &cfg_dir);
 
 private:
-    static Bookmarks    *m_pThis;
-
     /**
      * @brief Decides if quoting is needed and returns a safe string
      * @param unquoted
