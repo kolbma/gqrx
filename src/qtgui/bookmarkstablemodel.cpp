@@ -30,13 +30,14 @@ BookmarksTableModel::BookmarksTableModel(QObject *parent) :
 {
 }
 
-int BookmarksTableModel::rowCount(const QModelIndex &parent) const
+int BookmarksTableModel::rowCount(const QModelIndex& /* parent */) const
 {
-    return m_Bookmarks.size();
+    return m_bookmarks.size();
 }
-int BookmarksTableModel::columnCount(const QModelIndex &parent) const
+
+int BookmarksTableModel::columnCount(const QModelIndex& /* parent */) const
 {
-    return 5;
+    return EColumns::COL_SPACER + 1;
 }
 
 QVariant BookmarksTableModel::headerData(int section, Qt::Orientation orientation, int role) const
@@ -58,7 +59,10 @@ QVariant BookmarksTableModel::headerData(int section, Qt::Orientation orientatio
             return QString("Bandwidth");
             break;
         case COL_TAGS:
-            return QString("Tag");
+            return QString("Tags");
+            break;
+        case COL_SPACER:
+            return QString();
             break;
         }
     }
@@ -71,7 +75,7 @@ QVariant BookmarksTableModel::headerData(int section, Qt::Orientation orientatio
 
 QVariant BookmarksTableModel::data(const QModelIndex &index, int role) const
 {
-    BookmarkInfo &info = *m_Bookmarks[index.row()];
+    BookmarkInfo &info = *m_bookmarks[index.row()];
 
     if (role == Qt::BackgroundColorRole)
     {
@@ -84,25 +88,29 @@ QVariant BookmarksTableModel::data(const QModelIndex &index, int role) const
         switch(index.column())
         {
         case COL_FREQUENCY:
-                return info.frequency;
+            return info.frequency;
         case COL_NAME:
-                return (role == Qt::EditRole) ? QString(info.name) : info.name;
+            return (role == Qt::EditRole) ? QString(info.name) : info.name;
         case COL_MODULATION:
-                return info.modulation;
+            return info.modulation;
         case COL_BANDWIDTH:
             return (info.bandwidth == 0) ? QVariant("") : QVariant(info.bandwidth);
-         case COL_TAGS:
-            QString strTags;
-            for(int iTag=0; iTag < info.tags.size(); ++iTag)
+        case COL_TAGS:
             {
-                if(iTag != 0)
+                QString strTags;
+                for(int iTag = 0; iTag < info.tags.size(); ++iTag)
                 {
-                    strTags.append(",");
+                    if(iTag != 0)
+                    {
+                        strTags.append(",");
+                    }
+                    TagInfo &tag = *info.tags[iTag];
+                    strTags.append(tag.name);
                 }
-                TagInfo &tag = *info.tags[iTag];
-                strTags.append(tag.name);
+                return strTags;
             }
-            return strTags;
+        case COL_SPACER:
+            return QString();
         }
     }
     return QVariant();
@@ -112,7 +120,7 @@ bool BookmarksTableModel::setData(const QModelIndex &index, const QVariant &valu
 {
     if(role == Qt::EditRole)
     {
-        BookmarkInfo &info = *m_Bookmarks[index.row()];
+        BookmarkInfo &info = *m_bookmarks[index.row()];
         switch(index.column())
         {
         case COL_FREQUENCY:
@@ -130,7 +138,7 @@ bool BookmarksTableModel::setData(const QModelIndex &index, const QVariant &valu
             break;
         case COL_MODULATION:
             {
-                Q_ASSERT(!value.toString().contains(";")); // may not contain a comma because tablemodel is saved as comma-separated file (csv).
+                Q_ASSERT(!value.toString().contains(Bookmarks::CSV_SEPARATOR)); // may not contain a comma because tablemodel is saved as comma-separated file (csv).
                 if(DockRxOpt::IsModulationValid(value.toString()))
                 {
                     info.modulation = value.toString();
@@ -148,8 +156,8 @@ bool BookmarksTableModel::setData(const QModelIndex &index, const QVariant &valu
             {
                 info.tags.clear();
                 QString strValue = value.toString();
-                QStringList strList = strValue.split(",");
-                for(int i=0; i < strList.size(); ++i)
+                QStringList strList = strValue.split(Bookmarks::TAG_SEPARATOR); // TODO handle this
+                for(int i = 0; i < strList.size(); ++i)
                 {
                     QString strTag = strList[i].trimmed();
                     info.tags.append(&Bookmarks::instance().findOrAddTag(strTag));
@@ -157,6 +165,8 @@ bool BookmarksTableModel::setData(const QModelIndex &index, const QVariant &valu
                 emit dataChanged(index, index);
                 return true;
             }
+            break;
+        case COL_SPACER:
             break;
         }
         return true; // return true means success
@@ -171,12 +181,21 @@ Qt::ItemFlags BookmarksTableModel::flags(const QModelIndex &index) const
     switch(index.column())
     {
     case COL_FREQUENCY:
+        flags = Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsEditable;
+        break;
     case COL_NAME:
+        flags = Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsEditable;
+        break;
     case COL_BANDWIDTH:
+        flags = Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsEditable;
+        break;
     case COL_MODULATION:
         flags = Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsEditable;
         break;
     case COL_TAGS:
+        flags = Qt::ItemIsEnabled | Qt::ItemIsSelectable;
+        break;
+    case COL_SPACER:
         flags = Qt::ItemIsEnabled | Qt::ItemIsSelectable;
         break;
     }
@@ -185,9 +204,8 @@ Qt::ItemFlags BookmarksTableModel::flags(const QModelIndex &index) const
 
 void BookmarksTableModel::update()
 {
-    int iRow = 0;
-    m_Bookmarks.clear();
-    for(int iBookmark = 0; iBookmark < Bookmarks::instance().size(); iBookmark++)
+    m_bookmarks.clear();
+    for(int iBookmark = 0, iRow = 0; iBookmark < Bookmarks::instance().size(); iBookmark++)
     {
         BookmarkInfo &info = Bookmarks::instance().getBookmark(iBookmark);
 
@@ -204,7 +222,7 @@ void BookmarksTableModel::update()
         if(bActive)
         {
             m_mapRowToBookmarksIndex[iRow] = iBookmark;
-            m_Bookmarks.append(&info);
+            m_bookmarks.append(&info);
             ++iRow;
         }
     }
@@ -214,10 +232,10 @@ void BookmarksTableModel::update()
 
 BookmarkInfo *BookmarksTableModel::getBookmarkAtRow(int row)
 {
-    return m_Bookmarks[row];
+    return m_bookmarks[row];
 }
 
-int BookmarksTableModel::GetBookmarksIndexForRow(int iRow)
+int BookmarksTableModel::getBookmarksIndexForRow(int iRow)
 {
   return m_mapRowToBookmarksIndex[iRow];
 }

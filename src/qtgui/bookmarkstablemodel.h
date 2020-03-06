@@ -38,7 +38,8 @@ public:
         COL_NAME,
         COL_MODULATION,
         COL_BANDWIDTH,
-        COL_TAGS
+        COL_TAGS,
+        COL_SPACER
     };
 
     explicit BookmarksTableModel(QObject *parent = 0);
@@ -46,15 +47,15 @@ public:
     int rowCount(const QModelIndex &parent = QModelIndex()) const;
     int columnCount(const QModelIndex &parent = QModelIndex()) const;
     QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const;
-    QVariant data(const QModelIndex &index, int role = Qt::DisplayRole ) const;
+    QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const;
     bool setData(const QModelIndex &index, const QVariant & value, int role = Qt::EditRole);
     Qt::ItemFlags flags(const QModelIndex &index) const;
 
     BookmarkInfo *getBookmarkAtRow(int row);
-    int GetBookmarksIndexForRow(int iRow);
+    int getBookmarksIndexForRow(int row);
 
 private:
-    QList<BookmarkInfo*> m_Bookmarks;
+    QList<BookmarkInfo*> m_bookmarks;
     QMap<int, int> m_mapRowToBookmarksIndex;
 
 public slots:
