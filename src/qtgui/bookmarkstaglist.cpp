@@ -50,8 +50,8 @@ BookmarksTagList::BookmarksTagList(QWidget *parent, bool bShowUntagged)
     setColumnCount(2);
     setColumnWidth(0, 20);
 
-    model()->setHeaderData(0, Qt::Horizontal, QVariant(""));
-    model()->setHeaderData(1, Qt::Horizontal, QVariant("Tags"));
+    setHorizontalHeaderItem(0, new QTableWidgetItem(""));
+    setHorizontalHeaderItem(1, new QTableWidgetItem("Tags"));
 
     setSelectionMode(QAbstractItemView::SingleSelection);
     setSelectionBehavior(QAbstractItemView::SelectRows);
