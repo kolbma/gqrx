@@ -28,77 +28,89 @@
 #include <QMap>
 #include <QObject>
 #include <QStringList>
+#include <QUuid>
 
+/**
+ * @brief The TagInfo struct for storing data of tags
+ */
 struct TagInfo
 {
     static const QColor DEFAULT_COLOR;
     static const QString UNTAGGED;
 
+    bool    active;
+    QColor  color;
+    QUuid   id;
     QString name;
-    QColor color;
-    bool active;
 
-    TagInfo()
-    {
-        active = true;
-        this->color = DEFAULT_COLOR;
-    }
+    TagInfo();
+    TagInfo(const QString &name);
 
-    TagInfo(const QString &name)
-    {
-        active = true;
-        this->color = DEFAULT_COLOR;
-        this->name = name;
-    }
+    /**
+     * @brief compares member name
+     * @param other
+     * @return
+     */
+    bool operator<(const TagInfo &other) const;
 
-    bool operator<(const TagInfo &other) const
-    {
-        return name < other.name;
-    }
+    /**
+     * @brief compares member id for equality
+     * @param other
+     * @return
+     */
+    bool operator==(const TagInfo &other) const;
 
-    bool operator==(const TagInfo &other) const
-    {
-        return name == other.name;
-    }
+    /**
+     * @brief compares member id for inequality
+     * @param other
+     * @return
+     */
+    bool operator!=(const TagInfo &other) const;
 };
 
+/**
+ * @brief The BookmarkInfo struct for storing data of bookmark
+ */
 struct BookmarkInfo
 {
+    qint64  bandwidth;
+    QUuid   id;
+    QString info;
     qint64  frequency;
     QString name;
     QString modulation;
-    qint64  bandwidth;
     QList<TagInfo*> tags;
 
-    BookmarkInfo()
-    {
-        this->frequency = 0;
-        this->bandwidth = 0;
-    }
+    BookmarkInfo();
 
-/*    BookmarkInfo( qint64 frequency, QString name, qint64 bandwidth, QString modulation )
-    {
-        this->frequency = frequency;
-        this->name = name;
-        this->modulation = modulation;
-        this->bandwidth = bandwidth;
-    }
-*/
-    bool operator<(const BookmarkInfo &other) const
-    {
-        return frequency < other.frequency;
-    }
-/*
-    void setTags(QString tagString);
-    QString getTagString();
-    bool hasTags(QString _tags);
-    bool hasTags(QStringList _tags);
- */
+    /**
+     * @brief compares frequency
+     * @param other
+     * @return
+     */
+    bool operator<(const BookmarkInfo &other) const;
+
+    /**
+     * @brief compares for equal id(s)
+     * @param other
+     * @return
+     */
+    bool operator==(const BookmarkInfo &other) const;
+
+    /**
+     * @brief compares for not equal id(s)
+     * @param other
+     * @return
+     */
+    bool operator!=(const BookmarkInfo &other) const;
 
     const QColor &getColor() const;
     bool isActive() const;
 };
 
+/**
+ * @brief The Bookmarks class holding all bookmarks
+ */
 class Bookmarks : public QObject
 {
     Q_OBJECT
@@ -115,31 +127,6 @@ public:
     static Bookmarks &instance();
 
     void add(const BookmarkInfo &info);
-    void remove(int index);
-
-    /**
-     * @brief Loads special formatted data with semikolon and comma separator
-     * @details should enable all chars in the data, only combination "; gets replaced with "_
-     * @see csvsplit()
-     * @return true on success
-     */
-    bool load();
-
-    /**
-     * @brief Safe save with temporary file, backup and replacement
-     * @details does quoting of separator chars for some text fields
-     * @see csvquote()
-     * @return true on success
-     */
-    bool save();
-
-    int size() { return m_bookmarkList.size(); }
-    BookmarkInfo &getBookmark(int i) { return m_bookmarkList[i]; }
-    QList<BookmarkInfo> getBookmarksInRange(qint64 low, qint64 high);
-    //int lowerBound(qint64 low);
-    //int upperBound(qint64 high);
-
-    QList<TagInfo> getTagList() { return  QList<TagInfo>(m_tagList); }
 
     /**
      * @brief find or add a tag with internal trimmed tagName
@@ -147,6 +134,18 @@ public:
      * @return  TagInfo&
      */
     TagInfo &findOrAddTag(const QString &tagName);
+
+    BookmarkInfo &getBookmark(int i) { return m_bookmarkList[i]; }
+    QList<BookmarkInfo> getBookmarksInRange(qint64 low, qint64 high);
+
+    /**
+     * @brief get index for internal trimmed tagName
+     * @param tagName (need not to be trimmed)
+     * @return int index
+     */
+    int getTagIndex(const QString &tagName);
+
+    QList<TagInfo> getTagList() { return  QList<TagInfo>(m_tagList); }
 
     /**
      * @brief get pointer to TagInfo by tagName
@@ -157,11 +156,15 @@ public:
     void getTagInfo(const TagInfo *tagInfo, const QString &tagName) const;
 
     /**
-     * @brief get index for internal trimmed tagName
-     * @param tagName (need not to be trimmed)
-     * @return int index
+     * @brief Loads special formatted data with semikolon and comma separator
+     * @details should enable all chars in the data, only combination "; gets replaced with "_
+     * @see csvsplit()
+     * @return true on success
      */
-    int getTagIndex(const QString &tagName);
+    bool load();
+
+
+    void remove(int index);
 
     /**
      * @brief remove tag for internal trimmed tagName
@@ -171,6 +174,20 @@ public:
     bool removeTag(const QString &tagName);
 
     /**
+     * @brief Safe save with temporary file, backup and replacement
+     * @details does quoting of separator chars for some text fields
+     * @see csvquote()
+     * @return true on success
+     */
+    bool save();
+
+    /**
+     * @brief setConfigDir to know where to save()
+     * @param cfg_dir
+     */
+    void setConfigDir(const QString &cfg_dir);
+
+    /**
      * @brief set active state of tag
      * @param tagName
      * @param is_active
@@ -178,9 +195,23 @@ public:
      */
     bool setTagActive(const QString &tagName, bool is_active);
 
-    void setConfigDir(const QString &cfg_dir);
+    int size() { return m_bookmarkList.size(); }
+
+signals:
+    void bookmarksChanged(void);
+    void tagListChanged(void);
 
 private:
+    bool                 m_bmModified;
+    QList<BookmarkInfo>  m_bookmarkList;
+    QString              m_bookmarksFile;
+    QList<TagInfo>       m_tagList;
+
+    /**
+     * @brief Bookmarks is lazy initialized static singleton instance
+     */
+    Bookmarks();
+
     /**
      * @brief Decides if quoting is needed and returns a safe string
      * @param unquoted
@@ -198,16 +229,6 @@ private:
      * @return empty list if fieldCount does not match, filled list on success
      */
     static QStringList csvsplit(const QString &text, int fieldCount, const QString &separator = CSV_SEPARATOR);
-
-    QList<BookmarkInfo>  m_bookmarkList;
-    QList<TagInfo>       m_tagList;
-    QString              m_bookmarksFile;
-
-    Bookmarks(); // Singleton Constructor is private.
-
-signals:
-    void bookmarksChanged(void);
-    void tagListChanged(void);
 };
 
 #endif // BOOKMARKS_H
