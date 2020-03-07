@@ -92,10 +92,21 @@ bool BandPlan::load()
 QList<BandInfo> BandPlan::getBandsInRange(qint64 low, qint64 high)
 {
     QList<BandInfo> found;
-    for (int i = 0; i < m_BandInfoList.size(); i++){
-        if(m_BandInfoList[i].maxFrequency >= low || m_BandInfoList[i].minFrequency <= high){
-            found.append(m_BandInfoList[i]);
-        }
+    for (int i = 0; i < m_BandInfoList.size(); i++) {
+        if(m_BandInfoList[i].maxFrequency < low) continue;
+        if(m_BandInfoList[i].minFrequency > high) continue;
+        found.append(m_BandInfoList[i]);
+    }
+    return found;
+}
+
+QList<BandInfo> BandPlan::getBandsEncompassing(qint64 freq)
+{
+    QList<BandInfo> found;
+    for (int i = 0; i < m_BandInfoList.size(); i++) {
+        if(m_BandInfoList[i].maxFrequency < freq) continue;
+        if(m_BandInfoList[i].minFrequency > freq) continue;
+        found.append(m_BandInfoList[i]);
     }
     return found;
 }
