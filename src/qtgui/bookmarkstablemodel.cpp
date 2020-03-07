@@ -30,14 +30,9 @@ BookmarksTableModel::BookmarksTableModel(QObject *parent) :
 {
 }
 
-int BookmarksTableModel::rowCount(const QModelIndex& /* parent */) const
-{
-    return m_bookmarks.size();
-}
-
 int BookmarksTableModel::columnCount(const QModelIndex& /* parent */) const
 {
-    return EColumns::COL_SPACER + 1;
+    return EColumns::COL_INFO + 1;
 }
 
 QVariant BookmarksTableModel::headerData(int section, Qt::Orientation orientation, int role) const
@@ -61,8 +56,8 @@ QVariant BookmarksTableModel::headerData(int section, Qt::Orientation orientatio
         case COL_TAGS:
             return QString("Tags");
             break;
-        case COL_SPACER:
-            return QString();
+        case COL_INFO:
+            return QString("Info");
             break;
         }
     }
@@ -109,11 +104,54 @@ QVariant BookmarksTableModel::data(const QModelIndex &index, int role) const
                 }
                 return strTags;
             }
-        case COL_SPACER:
-            return QString();
+        case COL_INFO:
+            return info.info;
         }
     }
     return QVariant();
+}
+
+Qt::ItemFlags BookmarksTableModel::flags(const QModelIndex &index) const
+{
+    Qt::ItemFlags flags = 0;
+
+    switch(index.column())
+    {
+    case COL_FREQUENCY:
+        flags = Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsEditable;
+        break;
+    case COL_NAME:
+        flags = Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsEditable;
+        break;
+    case COL_BANDWIDTH:
+        flags = Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsEditable;
+        break;
+    case COL_MODULATION:
+        flags = Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsEditable;
+        break;
+    case COL_TAGS:
+        flags = Qt::ItemIsEnabled | Qt::ItemIsSelectable;
+        break;
+    case COL_INFO:
+        flags = Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsEditable;
+        break;
+    }
+    return flags;
+}
+
+BookmarkInfo *BookmarksTableModel::getBookmarkAtRow(int row)
+{
+    return m_bookmarks[row];
+}
+
+int BookmarksTableModel::getBookmarksIndexForRow(int iRow)
+{
+  return m_mapRowToBookmarksIndex[iRow];
+}
+
+int BookmarksTableModel::rowCount(const QModelIndex& /* parent */) const
+{
+    return m_bookmarks.size();
 }
 
 bool BookmarksTableModel::setData(const QModelIndex &index, const QVariant &value, int role)
@@ -166,40 +204,17 @@ bool BookmarksTableModel::setData(const QModelIndex &index, const QVariant &valu
                 return true;
             }
             break;
-        case COL_SPACER:
-            break;
+        case COL_INFO:
+            {
+                info.info = value.toString();
+                emit dataChanged(index, index);
+                return true;
+            }
+        break;
         }
         return true; // return true means success
     }
     return false;
-}
-
-Qt::ItemFlags BookmarksTableModel::flags(const QModelIndex &index) const
-{
-    Qt::ItemFlags flags = 0;
-
-    switch(index.column())
-    {
-    case COL_FREQUENCY:
-        flags = Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsEditable;
-        break;
-    case COL_NAME:
-        flags = Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsEditable;
-        break;
-    case COL_BANDWIDTH:
-        flags = Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsEditable;
-        break;
-    case COL_MODULATION:
-        flags = Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsEditable;
-        break;
-    case COL_TAGS:
-        flags = Qt::ItemIsEnabled | Qt::ItemIsSelectable;
-        break;
-    case COL_SPACER:
-        flags = Qt::ItemIsEnabled | Qt::ItemIsSelectable;
-        break;
-    }
-    return flags;
 }
 
 void BookmarksTableModel::update()
@@ -229,14 +244,3 @@ void BookmarksTableModel::update()
 
     emit layoutChanged();
 }
-
-BookmarkInfo *BookmarksTableModel::getBookmarkAtRow(int row)
-{
-    return m_bookmarks[row];
-}
-
-int BookmarksTableModel::getBookmarksIndexForRow(int iRow)
-{
-  return m_mapRowToBookmarksIndex[iRow];
-}
-
