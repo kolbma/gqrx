@@ -54,14 +54,14 @@ struct TagInfo
     bool operator<(const TagInfo &other) const;
 
     /**
-     * @brief compares member id for equality
+     * @brief compares member id or name for equality
      * @param other
      * @return
      */
     bool operator==(const TagInfo &other) const;
 
     /**
-     * @brief compares member id for inequality
+     * @brief compares member id or name for inequality
      * @param other
      * @return
      */
@@ -91,14 +91,14 @@ struct BookmarkInfo
     bool operator<(const BookmarkInfo &other) const;
 
     /**
-     * @brief compares for equal id(s)
+     * @brief compares for equal id(s) or frequency
      * @param other
      * @return
      */
     bool operator==(const BookmarkInfo &other) const;
 
     /**
-     * @brief compares for not equal id(s)
+     * @brief compares for not equal id(s) or frequency
      * @param other
      * @return
      */

@@ -66,7 +66,7 @@ bool TagInfo::operator<(const TagInfo &other) const
 
 bool TagInfo::operator==(const TagInfo &other) const
 {
-    return id == other.id;
+    return id == other.id || name == other.name;
 }
 
 bool TagInfo::operator!=(const TagInfo &other) const
@@ -91,7 +91,7 @@ bool BookmarkInfo::operator<(const BookmarkInfo &other) const
 
 bool BookmarkInfo::operator==(const BookmarkInfo &other) const
 {
-    return !id.isNull() && id == other.id;
+    return (!id.isNull() && id == other.id) || frequency == other.frequency;
 }
 
 bool BookmarkInfo::operator!=(const BookmarkInfo &other) const
@@ -188,7 +188,7 @@ TagInfo &Bookmarks::findOrAddTag(const QString &tagName)
     auto trimTag = tagName.trimmed();
 
     if (trimTag.isEmpty())
-        trimTag = TagInfo::UNTAGGED; // TODO we don't need this dummy tag
+        trimTag = TagInfo::UNTAGGED;
 
     const TagInfo info(trimTag);
     m_tagList.append(info);
