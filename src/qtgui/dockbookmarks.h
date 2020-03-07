@@ -4,6 +4,7 @@
  *           http://gqrx.dk/
  *
  * Copyright 2013 Christian Lindner DL2VCL, Stefano Leucci.
+ * Copyright 2020 Markus Kolb
  *
  * Gqrx is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -23,9 +24,10 @@
 #pragma once
 
 #include <QDockWidget>
-#include <QTableWidgetItem>
-#include "qtgui/bookmarkstablemodel.h"
 #include <QItemDelegate>
+#include <QTableWidgetItem>
+
+#include "qtgui/bookmarkstablemodel.h"
 
 namespace Ui {
     class DockBookmarks;
@@ -45,6 +47,23 @@ class DockBookmarks : public QDockWidget
 {
     Q_OBJECT
 
+public:
+    explicit DockBookmarks(QWidget *parent = 0);
+    ~DockBookmarks();
+
+    BookmarksTableModel *bookmarksTableModel;
+    QAction* actionAddBookmark;
+
+    void updateTags();
+    void updateBookmarks();
+    void selectBookmarkTags(int row, int /*column*/);
+
+signals:
+    void newBookmarkActivated(qint64, QString, int);
+
+public slots:
+    void setNewFrequency(qint64 rx_freq);
+
 private:
     Ui::DockBookmarks *ui;
     QMenu*             contextmenu;
@@ -53,32 +72,12 @@ private:
 
     bool eventFilter(QObject* object, QEvent* event);
 
-public:
-    explicit DockBookmarks(QWidget *parent = 0);
-    ~DockBookmarks();
-
-    // ui->tableViewFrequencyList
-    // ui->tableWidgetTagList
-    BookmarksTableModel *bookmarksTableModel;
-    QAction* actionAddBookmark;
-
-    void updateTags();
-    void updateBookmarks();
-    void changeBookmarkTags(int row, int /*column*/);
-
-signals:
-    void newBookmarkActivated(qint64, QString, int);
-
-public slots:
-    void setNewFrequency(qint64 rx_freq);
-
 private slots:
-    void activated(const QModelIndex & index );
-    void onDataChanged (const QModelIndex & topLeft, const QModelIndex & bottomRight);
-    //void on_addButton_clicked();
-    //void on_delButton_clicked();
-    void on_tableWidgetTagList_itemChanged(QTableWidgetItem* item);
-    void ShowContextMenu(const QPoint&pos);
-    bool DeleteSelectedBookmark();
-    void doubleClicked(const QModelIndex & index);
+    void activated(const QModelIndex &index);
+    bool deleteSelectedBookmark();
+    bool editSelectedField();
+    //void on_tableWidgetTagList_itemChanged(QTableWidgetItem* item);
+    void onDataChanged (const QModelIndex &topLeft, const QModelIndex &bottomRight);
+    void showContextMenu(const QPoint &pos);
+    void tagsClicked(const QModelIndex &index);
 };
