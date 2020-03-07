@@ -65,7 +65,8 @@ public:
     bool load();
     int size() { return m_BandInfoList.size(); }
     BandInfo& getBand(int i) { return m_BandInfoList[i]; }
-    QList<BandInfo> getBandsInRange(qint64 low, qint64 hight);
+    QList<BandInfo> getBandsInRange(qint64 low, qint64 high);
+    QList<BandInfo> getBandsEncompassing(qint64 freq);
 
     void setConfigDir(const QString&);
 
