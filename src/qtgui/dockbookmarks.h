@@ -33,6 +33,9 @@ namespace Ui {
     class DockBookmarks;
 }
 
+/**
+ * @brief The ComboBoxDelegateModulation class
+ */
 class ComboBoxDelegateModulation : public QItemDelegate
 {
 Q_OBJECT
@@ -43,6 +46,9 @@ public:
   void setModelData(QWidget *editor, QAbstractItemModel *model, const QModelIndex &index) const;
 };
 
+/**
+ * @brief The DockBookmarks class
+ */
 class DockBookmarks : public QDockWidget
 {
     Q_OBJECT
@@ -51,33 +57,34 @@ public:
     explicit DockBookmarks(QWidget *parent = 0);
     ~DockBookmarks();
 
-    BookmarksTableModel *bookmarksTableModel;
-    QAction* actionAddBookmark;
-
-    void updateTags();
     void updateBookmarks();
-    void selectBookmarkTags(int row, int /*column*/);
+    void updateTags();
 
 signals:
     void newBookmarkActivated(qint64, QString, int);
+    void newBookmarkAdd();
 
 public slots:
     void setNewFrequency(qint64 rx_freq);
 
 private:
-    Ui::DockBookmarks *ui;
-    QMenu*             contextmenu;
-    qint64             m_currentFrequency;
-    bool               m_updating;
+    BookmarksTableModel        *bookmarksTableModel;
+    QMenu                      *contextmenu;
+    ComboBoxDelegateModulation *delegateModulation;
+    qint64                      m_currentFrequency;
+    bool                        m_updating;
+    Ui::DockBookmarks          *ui;
 
     bool eventFilter(QObject* object, QEvent* event);
+    void showTagsSelector(int row, int /*column*/);
 
 private slots:
     void activated(const QModelIndex &index);
+    void addBookmark();
     bool deleteSelectedBookmark();
     bool editSelectedField();
     //void on_tableWidgetTagList_itemChanged(QTableWidgetItem* item);
-    void onDataChanged (const QModelIndex &topLeft, const QModelIndex &bottomRight);
+    void onDataChanged(const QModelIndex &topLeft, const QModelIndex &bottomRight);
     void showContextMenu(const QPoint &pos);
     void tagsClicked(const QModelIndex &index);
 };
