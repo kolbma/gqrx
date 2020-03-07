@@ -401,7 +401,7 @@ bool Bookmarks::save()
 
         if (usedInfoField)
         {
-            stream << QString("Tags").rightJustified(FIELD_WIDTH_TAG) << CSV_SEPARATOR2 << QString("Info");
+            stream << QString("Tags").leftJustified(FIELD_WIDTH_TAG) << CSV_SEPARATOR2 << QString("Info");
         }
         else
         {
