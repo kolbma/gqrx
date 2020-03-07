@@ -4,6 +4,7 @@
  *           http://gqrx.dk/
  *
  * Copyright 2014 Stefano Leucci, Christian Lindner DL2VCL.
+ * Copyright 2020 Markus Kolb
  *
  * Gqrx is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -30,32 +31,39 @@
 
 BookmarksTagList::BookmarksTagList(QWidget *parent, bool bShowUntagged)
     : QTableWidget(parent),
-      m_bUpdating(false),
-      m_bShowUntagged(bShowUntagged)
+      m_bShowUntagged(bShowUntagged),
+      m_bUpdating(false)
 {
-    connect(this, SIGNAL(cellClicked(int,int)),
-            this, SLOT(on_cellClicked(int,int)));
+    connect(this, SIGNAL(cellClicked(int, int)),
+            this, SLOT(on_cellClicked(int, int)));
 
     // right click menu
     setContextMenuPolicy(Qt::CustomContextMenu);
     connect(this, SIGNAL(customContextMenuRequested(const QPoint&)),
-            this, SLOT(ShowContextMenu(const QPoint&)));
+            this, SLOT(showContextMenu(const QPoint&)));
 
-    horizontalHeader()->setVisible(false);
+    //horizontalHeader()->setVisible(false);
+    horizontalHeader()->setStretchLastSection(true);
+
     verticalHeader()->setVisible(false);
+
     setColumnCount(2);
     setColumnWidth(0, 20);
-    horizontalHeader()->setStretchLastSection(true);
+
+    model()->setHeaderData(0, Qt::Horizontal, QVariant(""));
+    model()->setHeaderData(1, Qt::Horizontal, QVariant("Tags"));
+
     setSelectionMode(QAbstractItemView::SingleSelection);
     setSelectionBehavior(QAbstractItemView::SelectRows);
-    setSortingEnabled(true);
+    //setSortingEnabled(true);
+    // TODO remove commented
 }
 
 void BookmarksTagList::on_cellClicked(int row, int column)
 {
     if(column == 0)
     {
-        changeColor(row, column);
+        changeColor(row);
     }
     if(column == 1)
     {
@@ -63,7 +71,7 @@ void BookmarksTagList::on_cellClicked(int row, int column)
     }
 }
 
-void BookmarksTagList::changeColor(int row, int column)
+void BookmarksTagList::changeColor(int row)
 {
     TagInfo &info = Bookmarks::instance().findOrAddTag(item(row, 1)->text());
     QColor color = QColorDialog::getColor(info.color, this);
@@ -113,12 +121,12 @@ void BookmarksTagList::updateTags()
     }
 
     // Rebuild List in GUI.
-    clear();
+    clearContents();
     setSortingEnabled(false);
     setRowCount(0);
     for(int i=0; i < newTags.count(); i++)
     {
-        AddTag(newTags[i].name,
+        addTag(newTags[i].name,
                unchecked.contains(newTags[i].name) ? Qt::Unchecked : Qt::Checked,
                newTags[i].color);
     }
@@ -180,7 +188,7 @@ QString BookmarksTagList::getSelectedTagsAsString()
     return strResult;
 }
 
-void BookmarksTagList::ShowContextMenu(const QPoint &pos)
+void BookmarksTagList::showContextMenu(const QPoint &pos)
 {
     QMenu *menu = new QMenu(this);  // TODO: check if there is a delete!!!
 
@@ -188,73 +196,67 @@ void BookmarksTagList::ShowContextMenu(const QPoint &pos)
     // The problem is that after the tag name is changed in GUI
     // you can not find the right TagInfo because you dont know
     // the old tag name.
-    #if 0
     // MenuItem "Rename"
     {
         QAction *actionRename = new QAction("Rename", this);
         menu->addAction(actionRename);
-        connect(actionRename, SIGNAL(triggered()), this, SLOT(RenameSelectedTag()));
+        connect(actionRename, SIGNAL(triggered()), this, SLOT(renameSelectedTag()));
     }
-    #endif
 
     // MenuItem "Create new Tag"
     {
         QAction *actionNewTag = new QAction("Create new Tag", this);
         menu->addAction(actionNewTag);
-        connect(actionNewTag, SIGNAL(triggered()), this, SLOT(AddNewTag()));
+        connect(actionNewTag, SIGNAL(triggered()), this, SLOT(addNewTag()));
     }
 
     // Menu "Delete Tag"
     {
         QAction *actionDeleteTag = new QAction("Delete Tag", this);
         menu->addAction(actionDeleteTag);
-        connect(actionDeleteTag, SIGNAL(triggered()), this, SLOT(DeleteSelectedTag()));
+        connect(actionDeleteTag, SIGNAL(triggered()), this, SLOT(deleteSelectedTag()));
     }
 
     // Menu "Select All"
     {
         QAction *action = new QAction("Select All", this);
         menu->addAction(action);
-        connect(action, SIGNAL(triggered()), this, SLOT(SelectAll()));
+        connect(action, SIGNAL(triggered()), this, SLOT(selectAll()));
     }
 
     // Menu "Deselect All"
     {
         QAction *action = new QAction("Deselect All", this);
         menu->addAction(action);
-        connect(action, SIGNAL(triggered()), this, SLOT(DeselectAll()));
+        connect(action, SIGNAL(triggered()), this, SLOT(deselectAll()));
     }
 
     menu->popup(viewport()->mapToGlobal(pos));
 }
 
-#if 0
-bool BookmarksTagList::RenameSelectedTag()
+bool BookmarksTagList::renameSelectedTag()
 {
     QModelIndexList selected = selectionModel()->selectedRows();
 
     if(selected.empty())
-    {
         return true;
-    }
 
     int iRow = selected.first().row();
-    QTableWidgetItem *pItem = item(iRow,1);bUpdating
+    QTableWidgetItem *pItem = item(iRow, 1);
     editItem(pItem);
     //Bookmarks::get().save();
 
     return true;
 }
-#endif
 
-void BookmarksTagList::AddNewTag()
+void BookmarksTagList::addNewTag()
 {
-    AddTag("*new*");
+    addTag("*enter tag name*");
     scrollToBottom();
     editItem(item(rowCount() - 1, 1));
 }
 
-void BookmarksTagList::AddTag(QString name, Qt::CheckState checkstate, QColor color)
+void BookmarksTagList::addTag(QString name, Qt::CheckState checkstate, QColor color)
 {
     int i = rowCount();
     setRowCount(i + 1);
@@ -272,7 +274,7 @@ void BookmarksTagList::AddTag(QString name, Qt::CheckState checkstate, QColor co
     setItem(i, 0, item);
 }
 
-void BookmarksTagList::DeleteSelectedTag()
+void BookmarksTagList::deleteSelectedTag()
 {
     QModelIndexList selected = selectionModel()->selectedRows();
     if(selected.empty())
@@ -281,17 +283,17 @@ void BookmarksTagList::DeleteSelectedTag()
     int iRow = selected.first().row();
     QTableWidgetItem *pItem = item(iRow, 1);
     QString strTagName = pItem->text();
-    DeleteTag(strTagName);
+    deleteTag(strTagName);
     return;
 }
 
-void BookmarksTagList::DeleteTag(const QString &name)
+void BookmarksTagList::deleteTag(const QString &name)
 {
     Bookmarks::instance().removeTag(name);
     updateTags();
 }
 
-void BookmarksTagList::SelectAll()
+void BookmarksTagList::selectAll()
 {
     int iRows = rowCount();
     for(int i=0; i < iRows; ++i)
@@ -302,7 +304,7 @@ void BookmarksTagList::SelectAll()
     }
 }
 
-void BookmarksTagList::DeselectAll()
+void BookmarksTagList::deselectAll()
 {
     int iRows = rowCount();
     for(int i=0; i < iRows; ++i)

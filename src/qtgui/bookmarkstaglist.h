@@ -4,6 +4,7 @@
  *           http://gqrx.dk/
  *
  * Copyright 2014 Stefano Leucci, Christian Lindner DL2VCL.
+ * Copyright 2020 Markus Kolb
  *
  * Gqrx is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -39,24 +40,24 @@ public:
     QString getSelectedTagsAsString();
     void setSelectedTagsAsString(const QString &strTags);
     void setSelectedTags(QList<TagInfo*> tags);
-    bool m_bUpdating;
 
 private:
     bool m_bShowUntagged;
+    bool m_bUpdating; // TODO currently not used
 
 public slots:
     void updateTags();
     void on_cellClicked(int row, int column);
-    void changeColor(int row, int column);
+    void changeColor(int row);
     void toggleCheckedState(int row, int column);
-    void ShowContextMenu(const QPoint &pos);
-    //bool RenameSelectedTag();
-    void AddNewTag();
-    void AddTag(QString name, Qt::CheckState checkstate = Qt::Checked, QColor color = TagInfo::DEFAULT_COLOR);
-    void DeleteSelectedTag();
-    void DeleteTag(const QString &name);
-    void SelectAll();
-    void DeselectAll();
+    void showContextMenu(const QPoint &pos);
+    bool renameSelectedTag();
+    void addNewTag();
+    void addTag(QString name, Qt::CheckState checkstate = Qt::Checked, QColor color = TagInfo::DEFAULT_COLOR);
+    void deleteSelectedTag();
+    void deleteTag(const QString &name);
+    void selectAll();
+    void deselectAll();
 };
 
 #endif // BOOKMARKSTAGLIST_H

@@ -2272,7 +2272,7 @@ void MainWindow::on_actionAddBookmark_triggered()
 
         BookmarksTagList* taglist = new BookmarksTagList(&dialog, false);
         taglist->updateTags();
-        taglist->DeselectAll();
+        taglist->deselectAll();
 
         QDialogButtonBox* buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok
                                               | QDialogButtonBox::Cancel);
