@@ -255,7 +255,7 @@ MainWindow::MainWindow(const QString cfgfile, bool edit_conf, QWidget *parent) :
 
     // Bookmarks
     connect(uiDockBookmarks, SIGNAL(newBookmarkActivated(qint64, QString, int)), this, SLOT(onBookmarkActivated(qint64, QString, int)));
-    connect(uiDockBookmarks->actionAddBookmark, SIGNAL(triggered()), this, SLOT(on_actionAddBookmark_triggered()));
+    connect(uiDockBookmarks, SIGNAL(newBookmarkAdd()), this, SLOT(showNewBookmarkAdd()));
 
 
     // I/Q playback
@@ -2248,7 +2248,7 @@ void MainWindow::on_actionAboutQt_triggered()
     QMessageBox::aboutQt(this, tr("About Qt"));
 }
 
-void MainWindow::on_actionAddBookmark_triggered()
+void MainWindow::showNewBookmarkAdd()
 {
     bool ok=false;
     QString name;

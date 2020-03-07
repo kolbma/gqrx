@@ -217,7 +217,7 @@ private slots:
     void on_actionRemoteProtocol_triggered();
     void on_actionAbout_triggered();
     void on_actionAboutQt_triggered();
-    void on_actionAddBookmark_triggered();
+    void showNewBookmarkAdd();
 
 
     /* window close signals */
