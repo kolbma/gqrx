@@ -2276,6 +2276,9 @@ void MainWindow::on_actionAddBookmark_triggered()
     taglist->updateTags();
     taglist->deselectAll();
 
+    auto &bookmarks = Bookmarks::instance();
+    connect(&bookmarks, SIGNAL(tagListChanged()), taglist, SLOT(updateTags()));
+
     QDialogButtonBox *buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
     connect(buttonBox, SIGNAL(accepted()), &dialog, SLOT(accept()));
     connect(buttonBox, SIGNAL(rejected()), &dialog, SLOT(reject()));
@@ -2296,12 +2299,10 @@ void MainWindow::on_actionAddBookmark_triggered()
         info.modulation = uiDockRxOpt->currentDemodAsString();
         info.name = textfield->text().trimmed();
 
-        const QList<TagInfo *> tags = taglist->getCheckedTags();
-        qDebug() << "Tags: " << BookmarksTagList::toString(tags);
-        info.tags = tags;
+        info.setTags(taglist->getCheckedTags()); // modified for save is detected with tags in getCheckedTags
+        qDebug() << "Tags: " << info.tagsStr;
 
-        auto &bookmarks = Bookmarks::instance();
-        info.tags.append(&bookmarks.findOrAddTag(TagInfo::UNTAGGED));
+        info.addTagInfo(&bookmarks.findOrAddTag(TagInfo::UNTAGGED));
         bookmarks.add(info);
         emit bookmarks.tagListChanged();
         emit bookmarks.bookmarksChanged();
