@@ -4,6 +4,7 @@
  *           http://gqrx.dk/
  *
  * Copyright 2013 Christian Lindner DL2VCL, Stefano Leucci.
+ * Copyright 2020 Markus Kolb
  *
  * Gqrx is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -23,10 +24,12 @@
 
 #include "bookmarks.h"
 #include "bookmarkstablemodel.h"
+#include "bookmarkstaglist.h"
 #include "dockrxopt.h"
 
 BookmarksTableModel::BookmarksTableModel(QObject *parent) :
-    QAbstractTableModel(parent)
+    QAbstractTableModel(parent),
+    m_bookmarks(&Bookmarks::instance())
 {
 }
 
@@ -70,7 +73,7 @@ QVariant BookmarksTableModel::headerData(int section, Qt::Orientation orientatio
 
 QVariant BookmarksTableModel::data(const QModelIndex &index, int role) const
 {
-    BookmarkInfo &info = *m_bookmarks[index.row()];
+    BookmarkInfo &info = *m_bookmarkList[index.row()];
 
     if (role == Qt::BackgroundColorRole)
     {
@@ -91,19 +94,7 @@ QVariant BookmarksTableModel::data(const QModelIndex &index, int role) const
         case COL_BANDWIDTH:
             return (info.bandwidth == 0) ? QVariant("") : QVariant(info.bandwidth);
         case COL_TAGS:
-            {
-                QString strTags;
-                for(int iTag = 0; iTag < info.tags.size(); ++iTag)
-                {
-                    if(iTag != 0)
-                    {
-                        strTags.append(",");
-                    }
-                    TagInfo &tag = *info.tags[iTag];
-                    strTags.append(tag.name);
-                }
-                return strTags;
-            }
+            return BookmarksTagList::toString(info.getFilteredTags());
         case COL_INFO:
             return info.info;
         }
@@ -141,7 +132,7 @@ Qt::ItemFlags BookmarksTableModel::flags(const QModelIndex &index) const
 
 BookmarkInfo *BookmarksTableModel::getBookmarkAtRow(int row)
 {
-    return m_bookmarks[row];
+    return m_bookmarkList[row];
 }
 
 int BookmarksTableModel::getBookmarksIndexForRow(int iRow)
@@ -151,14 +142,14 @@ int BookmarksTableModel::getBookmarksIndexForRow(int iRow)
 
 int BookmarksTableModel::rowCount(const QModelIndex& /* parent */) const
 {
-    return m_bookmarks.size();
+    return m_bookmarkList.count();
 }
 
 bool BookmarksTableModel::setData(const QModelIndex &index, const QVariant &value, int role)
 {
     if(role == Qt::EditRole)
     {
-        BookmarkInfo &info = *m_bookmarks[index.row()];
+        BookmarkInfo &info = *m_bookmarkList[index.row()]; // TODO does this work with sorting?
         switch(index.column())
         {
         case COL_FREQUENCY:
@@ -176,7 +167,8 @@ bool BookmarksTableModel::setData(const QModelIndex &index, const QVariant &valu
             break;
         case COL_MODULATION:
             {
-                Q_ASSERT(!value.toString().contains(Bookmarks::CSV_SEPARATOR)); // may not contain a comma because tablemodel is saved as comma-separated file (csv).
+                // may not contain a comma because no csvsplit()
+                Q_ASSERT(!value.toString().contains(Bookmarks::CSV_SEPARATOR));
                 if(DockRxOpt::IsModulationValid(value.toString()))
                 {
                     info.modulation = value.toString();
@@ -192,14 +184,7 @@ bool BookmarksTableModel::setData(const QModelIndex &index, const QVariant &valu
             break;
         case COL_TAGS:
             {
-                info.tags.clear();
-                QString strValue = value.toString();
-                QStringList strList = strValue.split(Bookmarks::TAG_SEPARATOR); // TODO handle this
-                for(int i = 0; i < strList.size(); ++i)
-                {
-                    QString strTag = strList[i].trimmed();
-                    info.tags.append(&Bookmarks::instance().findOrAddTag(strTag));
-                }
+                // info.tags should be set by dialog
                 emit dataChanged(index, index);
                 return true;
             }
@@ -219,26 +204,21 @@ bool BookmarksTableModel::setData(const QModelIndex &index, const QVariant &valu
 
 void BookmarksTableModel::update()
 {
-    m_bookmarks.clear();
-    for(int iBookmark = 0, iRow = 0; iBookmark < Bookmarks::instance().size(); iBookmark++)
+    m_bookmarkList.clear();
+    for(int iBookmark = 0, count = m_bookmarks->count(), iRow = 0; iBookmark < count; iBookmark++)
     {
-        BookmarkInfo &info = Bookmarks::instance().getBookmark(iBookmark);
+        BookmarkInfo &info = m_bookmarks->getBookmark(iBookmark);
 
-        bool bActive = false;
-        for(int iTag = 0; iTag < info.tags.size(); ++iTag)
+        const int tagcount = info.tags.count();
+        for(int iTag = 0; iTag < tagcount; ++iTag)
         {
-            TagInfo &tag = *info.tags[iTag];
-            if(tag.active)
+            if(info.tags[iTag]->show)
             {
-                bActive = true;
+                m_mapRowToBookmarksIndex[iRow] = iBookmark; // TODO does this work mit sort?
+                m_bookmarkList.append(&info);
+                ++iRow;
                 break;
             }
-        }
-        if(bActive)
-        {
-            m_mapRowToBookmarksIndex[iRow] = iBookmark;
-            m_bookmarks.append(&info);
-            ++iRow;
         }
     }
 
