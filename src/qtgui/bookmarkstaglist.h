@@ -36,28 +36,49 @@ class BookmarksTagList : public QTableWidget
     Q_OBJECT
 
 public:
-    explicit BookmarksTagList(QWidget *parent = 0, bool bShowUntagged = true);
-    QString getSelectedTagsAsString();
-    void setSelectedTagsAsString(const QString &strTags);
-    void setSelectedTags(QList<TagInfo*> tags);
+    static QString toString(const QList<TagInfo *> &tagList);
 
-private:
-    bool m_bShowUntagged;
-    bool m_bUpdating; // TODO currently not used
+    enum Variant
+    {
+        Filter,
+        Selection
+    };
+
+    explicit BookmarksTagList(QWidget *parent = 0, bool bShowUntagged = true, Variant variant = Variant::Filter);
+    QList<TagInfo *> getCheckedTags();
+    //QString getSelectedTagsAsString();
+
+    /**
+     * @brief set checked/unchecked based on active state
+     * @param tags
+     */
+    void setTagsCheckState(const QList<TagInfo*> &tags);
+    //void setSelectedTagsAsString(const QString &strTags);
 
 public slots:
-    void updateTags();
-    void on_cellClicked(int row, int column);
-    void changeColor(int row);
-    void toggleCheckedState(int row, int column);
-    void showContextMenu(const QPoint &pos);
-    bool renameSelectedTag();
+    void addTag(const QUuid &id, const QString &name, Qt::CheckState checkstate = Qt::Checked,
+                const QColor &color = TagInfo::DEFAULT_COLOR);
     void addNewTag();
-    void addTag(QString name, Qt::CheckState checkstate = Qt::Checked, QColor color = TagInfo::DEFAULT_COLOR);
+    void changeColor(int row);
     void deleteSelectedTag();
-    void deleteTag(const QString &name);
-    void selectAll();
     void deselectAll();
+    void filterTags();
+    void on_cellClicked(int row, int column);
+    void on_itemChanged(QTableWidgetItem *item);
+    void renameSelectedTag();
+    void selectAll();
+    void showContextMenu(const QPoint &pos);
+    void toggleCheckedState(int row, int column);
+    void updateTags();
+
+private:
+    bool       m_blockSlot;
+    Bookmarks *m_bookmarks;
+    bool       m_bShowUntagged;
+    Variant    m_variant;
+
+    inline TagInfo &getTagInfo(const QTableWidgetItem *pItem);
+
 };
 
 #endif // BOOKMARKSTAGLIST_H
