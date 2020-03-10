@@ -91,6 +91,26 @@ bool TagInfo::operator!=(const TagInfo &other) const
     return !(*this == other);
 }
 
+// BookmarkInfo
+bool BookmarkInfo::compareTagInfoPtr(const TagInfo *a, const TagInfo *b)
+{
+    return a->name.toLower() < b->name.toLower();
+}
+
+QString BookmarkInfo::tagsToString(const QList<TagInfo *> &tagList)
+{
+    QString s;
+    auto sortedList = tagList;
+    std::stable_sort(sortedList.begin(), sortedList.end(), compareTagInfoPtr);
+    for (auto it = sortedList.cbegin(), it_begin = it, it_end = sortedList.cend(); it != it_end; it++)
+    {
+        if (it != it_begin)
+            s += Bookmarks::TAG_SEPARATOR2;
+        s += (*it)->name;
+    }
+    return s;
+}
+
 /**
  * @brief BookmarkInfo::BookmarkInfo
  */
@@ -102,15 +122,22 @@ BookmarkInfo::BookmarkInfo(bool modified) :
 {
 }
 
-void BookmarkInfo::addTagInfo(TagInfo *const tagInfo)
+void BookmarkInfo::addTagInfo(TagInfo * const tagInfo, bool modified)
 {
     tags.append(tagInfo);
+    tagsStr = tagsToString(getFilteredTags());
+    this->modified = modified;
 }
 
-QList<TagInfo *> BookmarkInfo::getFilteredTags()
+QList<TagInfo *> BookmarkInfo::getFilteredTags() const
+{
+    return getFilteredTags(tags);
+}
+
+QList<TagInfo *> BookmarkInfo::getFilteredTags(const QList<TagInfo *> &tagList) const
 {
     QList<TagInfo *> list;
-    for (auto it = tags.cbegin(), itend = tags.cend(); it != itend; it++)
+    for (auto it = tagList.cbegin(), itend = tagList.cend(); it != itend; it++)
     {
         if ((*it)->name == TagInfo::UNTAGGED)
             continue;
@@ -120,9 +147,27 @@ QList<TagInfo *> BookmarkInfo::getFilteredTags()
     return list;
 }
 
-bool BookmarkInfo::removeTagInfo(TagInfo *const tagInfo)
+bool BookmarkInfo::removeTagInfo(TagInfo * const tagInfo)
 {
-    return tags.removeOne(tagInfo);
+    const auto ret = tags.removeOne(tagInfo);
+    tagsStr = tagsToString(getFilteredTags());
+    modified = true;
+    return ret;
+}
+
+void BookmarkInfo::setTags(const QList<TagInfo *> &tagInfo)
+{
+    const auto oldTagsStr = tagsStr;
+    tagsStr = tagsToString(getFilteredTags(tagInfo));
+    if (tagsStr != oldTagsStr)
+    {
+        tags = tagInfo;
+        modified = true;
+    }
+    else
+    {
+        tagsStr = oldTagsStr;
+    }
 }
 
 bool BookmarkInfo::operator<(const BookmarkInfo &other) const
@@ -170,21 +215,6 @@ void Bookmarks::add(BookmarkInfo &info)
     std::stable_sort(m_bookmarkList.begin(), m_bookmarkList.end());
     emit bookmarksChanged();
     m_bmModified = true;
-}
-
-bool Bookmarks::addTagInfo(BookmarkInfo &bookmark, const QUuid &id)
-{
-    const int idx = m_tagList.indexOf(id);
-    if (idx < 0)
-        return false;
-
-    auto &tagInfo = m_tagList[idx];
-    if (bookmark.tags.indexOf(&tagInfo) < 0)
-    {
-        bookmark.tags.append(&tagInfo);
-        return true;
-    }
-    return false;
 }
 
 bool Bookmarks::addTagInfo(const TagInfo &tagInfo)
@@ -262,6 +292,7 @@ TagInfo &Bookmarks::getTagInfo(const QUuid &id)
     const int idx = m_tagList.indexOf(id);
     if (idx < 0)
     {
+        qWarning() << "Failed to find id" << id;
         throw "Failed to find id";
     }
     return m_tagList[idx];
@@ -337,10 +368,10 @@ bool Bookmarks::load()
                 const int tag_count = tagList.size();
                 for(int i = 0; i < tag_count; ++i)
                 {
-                  info.tags.append(&findOrAddTag(tagList[i], false));
+                    info.addTagInfo(&findOrAddTag(tagList[i], false), false); // here ok without modify
                 }
                 if (tag_count == 0)
-                    info.tags.append(&untaggedTag);
+                    info.addTagInfo(&untaggedTag, false); // here ok without modify
 
                 if (listcount == 6)
                     info.info = list[5];
@@ -386,20 +417,6 @@ void Bookmarks::remove(int index)
     emit bookmarksChanged();
 }
 
-bool Bookmarks::removeTagInfo(BookmarkInfo &bookmark, const QUuid &id)
-{
-    int idx = m_tagList.indexOf(id);
-    if (idx < 0)
-        return false;
-
-    const auto tagInfo = &m_tagList[idx];
-
-    if (tagInfo->name == TagInfo::UNTAGGED)
-        return false;
-
-    return bookmark.tags.removeOne(tagInfo);
-}
-
 bool Bookmarks::removeTagInfo(TagInfo &tagInfo)
 {
     if (tagInfo.name == TagInfo::UNTAGGED)
@@ -409,10 +426,10 @@ bool Bookmarks::removeTagInfo(TagInfo &tagInfo)
     const auto bmlist_end = m_bookmarkList.cend();
     for (auto it = m_bookmarkList.begin(); it != bmlist_end; it++)
     {
-        auto tags = &it->tags;
-        if (tags->removeOne(&tagInfo) && tags->count() == 0)
+        it->removeTagInfo(&tagInfo);
+        if (it->tags.count() == 0)
         {
-            tags->append(&findOrAddTag(TagInfo::UNTAGGED));
+            it->addTagInfo(&findOrAddTag(TagInfo::UNTAGGED));
         }
     }
 
@@ -491,11 +508,10 @@ bool Bookmarks::save()
                 {
                     m_bmModified = true;
                     it->modified = false;
-                    break;
+                    // no break;
                 }
             }
         }
-        if (!m_bmModified)
         {
             const auto it_end = m_bookmarkList.cend();
             for (auto it = m_bookmarkList.begin(); it != it_end; it++)
@@ -504,10 +520,11 @@ bool Bookmarks::save()
                 {
                     m_bmModified = true;
                     it->modified = false;
-                    break;
+                    // no break;
                 }
             }
         }
+
         if (!m_bmModified)
             return true;
     }

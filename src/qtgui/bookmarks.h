@@ -93,6 +93,9 @@ struct TagInfo
  */
 struct BookmarkInfo
 {
+    static bool compareTagInfoPtr(const TagInfo *a, const TagInfo *b);
+    static QString tagsToString(const QList<TagInfo *> &tagList);
+
     qint64  bandwidth;
     QUuid   id;
     QString info;
@@ -101,6 +104,7 @@ struct BookmarkInfo
     bool    modified;
     QString name;
     QList<TagInfo *> tags;
+    QString tagsStr;
 
     /**
      * @brief BookmarkInfo
@@ -111,21 +115,41 @@ struct BookmarkInfo
     /**
      * @brief add TagInfo by tagInfo pointer
      * @param tagInfo
+     * @param modified detects need for save
      */
-    void addTagInfo(TagInfo *const tagInfo);
+    void addTagInfo(TagInfo * const tagInfo, bool modified = true);
 
     /**
      * @brief get tags without TagInfo::UNTAGGED
      * @return QList<TagInfo *>
      */
-    QList<TagInfo *> getFilteredTags();
+    QList<TagInfo *> getFilteredTags() const;
+
+    /**
+     * @brief get tags without TagInfo::UNTAGGED
+     * @param const QList<TagInfo *>&
+     * @return QList<TagInfo *>
+     */
+    QList<TagInfo *> getFilteredTags(const QList<TagInfo *> &tagList) const;
+
+    /**
+     * @brief get tags without TagInfo::UNTAGGED
+     * @return QString
+     */
+    QString getTags() const;
 
     /**
      * @brief remove TagInfo by pointer
      * @param tagInfo
      * @return
      */
-    bool removeTagInfo(TagInfo *const tagInfo);
+    bool removeTagInfo(TagInfo * const tagInfo);
+
+    /**
+     * @brief set tags list of tagInfo pointer
+     * @param QList tagInfo
+     */
+    void setTags(const QList<TagInfo *> &tagInfo);
 
     /**
      * @brief compares frequency
@@ -183,14 +207,6 @@ public:
     void add(BookmarkInfo &info);
 
     /**
-     * @brief add TagInfo by QUuid to bookmark
-     * @param bookmark
-     * @param id
-     * @return
-     */
-    bool addTagInfo(BookmarkInfo &bookmark, const QUuid &id);
-
-    /**
      * @brief add TagInfo
      * @param tagInfo
      * @return
@@ -239,14 +255,6 @@ public:
     bool load();
 
     void remove(int index);
-
-    /**
-     * @brief remove TagInfo by QUuid from bookmark
-     * @param bookmark
-     * @param id
-     * @return
-     */
-    bool removeTagInfo(BookmarkInfo &bookmark, const QUuid &id);
 
     /**
      * @brief remove TagInfo by QUuid
