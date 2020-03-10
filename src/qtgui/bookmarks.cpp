@@ -22,6 +22,8 @@
  * Boston, MA 02110-1301, USA.
  */
 
+#include <algorithm>
+
 #ifndef QT_NO_DEBUG_OUTPUT
 #include <QDebug>
 #endif
@@ -38,24 +40,39 @@
 #define FIELD_WIDTH_MOD  20
 #define FIELD_WIDTH_TAG  22
 
+#define SAVE_TIMER_INTERVAL_MS 300000
+
 const QColor TagInfo::DEFAULT_COLOR(Qt::lightGray);
 const QString TagInfo::UNTAGGED("Untagged");
 
 /**
  * @brief TagInfo::TagInfo
  */
-TagInfo::TagInfo() :
-    active(true),
+TagInfo::TagInfo(bool modified) :
+    checked(false),
     color(DEFAULT_COLOR),
-    id(QUuid::createUuid())
+    id(QUuid::createUuid()),
+    modified(modified),
+    show(true)
 {
 }
 
-TagInfo::TagInfo(const QString &name) :
-    active(true),
+TagInfo::TagInfo(const QUuid &id, bool modified) :
+    checked(false),
+    color(DEFAULT_COLOR),
+    id(id),
+    modified(modified),
+    show(true)
+{
+}
+
+TagInfo::TagInfo(const QString &name, bool modified) :
+    checked(false),
     color(DEFAULT_COLOR),
     id(QUuid::createUuid()),
-    name(name)
+    modified(modified),
+    name(name.trimmed()),
+    show(true)
 {
 }
 
@@ -77,11 +94,35 @@ bool TagInfo::operator!=(const TagInfo &other) const
 /**
  * @brief BookmarkInfo::BookmarkInfo
  */
-BookmarkInfo::BookmarkInfo() :
+BookmarkInfo::BookmarkInfo(bool modified) :
     bandwidth(0),
     id(QUuid::createUuid()),
-    frequency(0)
+    frequency(0),
+    modified(modified)
 {
+}
+
+void BookmarkInfo::addTagInfo(TagInfo *const tagInfo)
+{
+    tags.append(tagInfo);
+}
+
+QList<TagInfo *> BookmarkInfo::getFilteredTags()
+{
+    QList<TagInfo *> list;
+    for (auto it = tags.cbegin(), itend = tags.cend(); it != itend; it++)
+    {
+        if ((*it)->name == TagInfo::UNTAGGED)
+            continue;
+
+        list.append(*it);
+    }
+    return list;
+}
+
+bool BookmarkInfo::removeTagInfo(TagInfo *const tagInfo)
+{
+    return tags.removeOne(tagInfo);
 }
 
 bool BookmarkInfo::operator<(const BookmarkInfo &other) const
@@ -103,26 +144,18 @@ const QColor &BookmarkInfo::getColor() const
 {
     for(int i = 0; i < tags.size(); ++i)
     {
-        if(tags[i]->active)
+        if(tags[i]->show)
             return tags[i]->color;
     }
     return TagInfo::DEFAULT_COLOR;
 }
 
-bool BookmarkInfo::isActive() const
-{
-    for(int i = 0; i < tags.size(); ++i)
-    {
-        if(tags[i]->active)
-            return true;
-    }
-    return false;
-}
-
 const QChar Bookmarks::CSV_QUOTE('"');
 const QString Bookmarks::CSV_SEPARATOR(";");
 const QString Bookmarks::CSV_SEPARATOR2("; ");
+const int Bookmarks::ID_ROLE(Qt::UserRole + 0x0001);
 const QString Bookmarks::TAG_SEPARATOR(",");
+const QString Bookmarks::TAG_SEPARATOR2(", ");
 
 Bookmarks &Bookmarks::instance()
 {
@@ -131,28 +164,82 @@ Bookmarks &Bookmarks::instance()
 }
 
 // TODO don't do this sort
-void Bookmarks::add(const BookmarkInfo &info)
+void Bookmarks::add(BookmarkInfo &info)
 {
     m_bookmarkList.append(info);
-    m_bmModified = true;
     std::stable_sort(m_bookmarkList.begin(), m_bookmarkList.end());
-    save();
     emit bookmarksChanged();
+    m_bmModified = true;
 }
 
-QList<BookmarkInfo> Bookmarks::getBookmarksInRange(qint64 low, qint64 high)
+bool Bookmarks::addTagInfo(BookmarkInfo &bookmark, const QUuid &id)
 {
-    BookmarkInfo info;
-    info.frequency=low;
-    QList<BookmarkInfo>::const_iterator lb = qLowerBound(m_bookmarkList, info);
-    info.frequency=high;
-    QList<BookmarkInfo>::const_iterator ub = qUpperBound(m_bookmarkList, info);
+    const int idx = m_tagList.indexOf(id);
+    if (idx < 0)
+        return false;
 
-    QList<BookmarkInfo> found;
+    auto &tagInfo = m_tagList[idx];
+    if (bookmark.tags.indexOf(&tagInfo) < 0)
+    {
+        bookmark.tags.append(&tagInfo);
+        return true;
+    }
+    return false;
+}
+
+bool Bookmarks::addTagInfo(const TagInfo &tagInfo)
+{
+    if (m_tagList.indexOf(tagInfo.name) < 0)
+    {
+        m_tagList.append(tagInfo);
+        return true;
+    }
+    return false;
+}
+
+TagInfo &Bookmarks::findOrAddTag(const QString &tagName, bool markModified)
+{
+    auto trimName = tagName.trimmed();
+    if (!trimName.isEmpty())
+    {
+        const int idx = m_tagList.indexOf(trimName);
+        if (idx >= 0)
+            return m_tagList[idx];
+    }
+    else
+    {
+        const int idx = m_tagList.indexOf(TagInfo::UNTAGGED);
+        if (idx >= 0)
+            return m_tagList[idx];
+        trimName = TagInfo::UNTAGGED;
+    }
+
+    const TagInfo info(tagName, markModified);
+    m_tagList.append(info);
+    const int idx = m_tagList.indexOf(trimName);
+    if (idx >= 0)
+    {
+        emit tagListChanged();
+        if (markModified && trimName != TagInfo::UNTAGGED)
+            m_bmModified = true; // only set for non-UNTAGGED
+        return m_tagList[idx];
+    }
+    Q_ASSERT(false);
+}
+
+QList<const BookmarkInfo *> Bookmarks::getBookmarksInRange(qint64 low, qint64 high) const
+{
+    BookmarkInfo infoBound;
+    infoBound.frequency=low;
+    auto lb = std::lower_bound(m_bookmarkList.cbegin(), m_bookmarkList.cend(), infoBound);
+    infoBound.frequency=high;
+    auto ub = std::upper_bound(m_bookmarkList.cbegin(), m_bookmarkList.cend(), infoBound);
+
+    QList<const BookmarkInfo *> found;
 
     while (lb != ub)
     {
-        const BookmarkInfo &info = *lb;
+        const BookmarkInfo *info = &(*lb);
         found.append(info);
         lb++;
     }
@@ -160,42 +247,23 @@ QList<BookmarkInfo> Bookmarks::getBookmarksInRange(qint64 low, qint64 high)
     return found;
 }
 
-int Bookmarks::getTagIndex(const QString &tagName)
+const TagInfo &Bookmarks::getTagInfo(const QUuid &id) const
 {
-    if (tagName.isNull() || tagName.isEmpty())
-        return -1;
-    return m_tagList.indexOf(tagName.trimmed());
+    const int idx = m_tagList.indexOf(id);
+    if (idx < 0)
+    {
+        throw "Failed to find id";
+    }
+    return m_tagList.at(idx);
 }
 
-void Bookmarks::getTagInfo(const TagInfo *tagInfo, const QString &tagName) const
+TagInfo &Bookmarks::getTagInfo(const QUuid &id)
 {
-    (void)tagInfo; // unused warning?
-    tagInfo = nullptr;
-    if (tagName.isNull() || tagName.isEmpty())
-        return;
-    const int i = m_tagList.indexOf(tagName.trimmed());
-    if (i < 0)
-        return;
-    tagInfo = &m_tagList[i];
-}
-
-TagInfo &Bookmarks::findOrAddTag(const QString &tagName)
-{
-    int idx = getTagIndex(tagName);
-    if (idx >= 0)
-        return m_tagList[idx];
-
-    auto trimTag = tagName.trimmed();
-
-    if (trimTag.isEmpty())
-        trimTag = TagInfo::UNTAGGED;
-
-    const TagInfo info(trimTag);
-    m_tagList.append(info);
-    idx = getTagIndex(trimTag);
-    emit tagListChanged();
-    m_bmModified = true;
-
+    const int idx = m_tagList.indexOf(id);
+    if (idx < 0)
+    {
+        throw "Failed to find id";
+    }
     return m_tagList[idx];
 }
 
@@ -206,11 +274,12 @@ bool Bookmarks::load()
     {
         QTextStream stream(&file);
 
+        m_bmModified = false; // no save during loading
         m_bookmarkList.clear();
         m_tagList.clear();
 
-        // always create the "Untagged" entry for enable filter on not tagged bookmarks
-        findOrAddTag(TagInfo::UNTAGGED);
+        // always create the UNTAGGED entry for enable filter on not tagged bookmarks
+        auto untaggedTag = findOrAddTag(TagInfo::UNTAGGED, false);
 
         // Read Tags, until first empty line.
         while (!stream.atEnd())
@@ -227,7 +296,8 @@ bool Bookmarks::load()
 
             if(list.count() == 2)
             {
-                TagInfo &info = findOrAddTag(list[0]); // emits tagListChanged()
+                auto info = findOrAddTag(list[0], false); // emits tagListChanged()
+                info.modified = false;  // freshly read
                 info.color = QColor(list[1]);
             }
 #ifndef QT_NO_DEBUG_OUTPUT
@@ -244,6 +314,8 @@ bool Bookmarks::load()
         {
             auto line = stream.readLine().trimmed();
 
+            // Hint: if there are more changes in field count, you could read the field count
+            //       from this comment line
             if(line.isEmpty() || line.startsWith("#"))
                 continue;
 
@@ -254,19 +326,21 @@ bool Bookmarks::load()
 
             if(list.count() == listcount)
             {
-                BookmarkInfo info;
+                BookmarkInfo info(false);
                 info.frequency  = list[0].toLongLong();
                 info.name       = list[1];
                 info.modulation = list[2];
                 info.bandwidth  = list[3].toInt();
 
                 // Multiple Tags may be separated by comma.
-                QStringList tagList = csvsplit(list[4] + ',', 0, TAG_SEPARATOR);
-                const int tag_size = tagList.size();
-                for(int i = 0; i < tag_size; ++i)
+                QStringList tagList = csvsplit(list[4] + TAG_SEPARATOR, 0, TAG_SEPARATOR);
+                const int tag_count = tagList.size();
+                for(int i = 0; i < tag_count; ++i)
                 {
-                  info.tags.append(&findOrAddTag(tagList[i]));
+                  info.tags.append(&findOrAddTag(tagList[i], false));
                 }
+                if (tag_count == 0)
+                    info.tags.append(&untaggedTag);
 
                 if (listcount == 6)
                     info.info = list[5];
@@ -299,7 +373,6 @@ bool Bookmarks::load()
 #endif
 
         emit bookmarksChanged();
-        m_bmModified = false;
         return true;
     }
 
@@ -310,58 +383,139 @@ void Bookmarks::remove(int index)
 {
     m_bookmarkList.removeAt(index);
     m_bmModified = true;
-    save();
     emit bookmarksChanged();
 }
 
-bool Bookmarks::removeTag(const QString &tagName)
+bool Bookmarks::removeTagInfo(BookmarkInfo &bookmark, const QUuid &id)
 {
-    int idx = getTagIndex(tagName);
+    int idx = m_tagList.indexOf(id);
     if (idx < 0)
         return false;
 
-    // Do not delete "Untagged" tag.
-    if(QString::compare(TagInfo::UNTAGGED, tagName.trimmed()) == 0)
+    const auto tagInfo = &m_tagList[idx];
+
+    if (tagInfo->name == TagInfo::UNTAGGED)
+        return false;
+
+    return bookmark.tags.removeOne(tagInfo);
+}
+
+bool Bookmarks::removeTagInfo(TagInfo &tagInfo)
+{
+    if (tagInfo.name == TagInfo::UNTAGGED)
         return false;
 
     // Delete Tag from all Bookmarks that use it.
-    // TODO: we need this often, so don't loop over and over
-    TagInfo *pTagToDelete = &m_tagList[idx];
-    for(int i = 0; i < m_bookmarkList.size(); ++i)
+    const auto bmlist_end = m_bookmarkList.cend();
+    for (auto it = m_bookmarkList.begin(); it != bmlist_end; it++)
     {
-        BookmarkInfo &bmi = m_bookmarkList[i];
-        for(int t = 0; t < bmi.tags.size(); ++t)
+        auto tags = &it->tags;
+        if (tags->removeOne(&tagInfo) && tags->count() == 0)
         {
-            TagInfo *pTag = bmi.tags[t];
-            if(pTag == pTagToDelete)
-            {
-                if(bmi.tags.size() > 1)
-                    bmi.tags.removeAt(t);
-                else
-                    bmi.tags[0] = &findOrAddTag(TagInfo::UNTAGGED);
-            }
+            tags->append(&findOrAddTag(TagInfo::UNTAGGED));
         }
     }
 
     // Delete Tag.
-    m_tagList.removeAt(idx);
+    m_tagList.removeOne(tagInfo);
 
     emit bookmarksChanged();
     emit tagListChanged();
 
-    m_bmModified = true;
+    return (m_bmModified = true);
+}
 
-    return true;
+void Bookmarks::setConfigDir(const QString &cfg_dir)
+{
+    m_bookmarksFile = cfg_dir + "/bookmarks.csv";
+#ifndef QT_NO_DEBUG_OUTPUT
+    qDebug() << "BookmarksFile is " << m_bookmarksFile;
+#endif
+}
+
+void Bookmarks::setModified(bool modified)
+{
+    m_bmModified = modified;
+}
+
+void Bookmarks::setTagChecked(const QUuid &id, bool checked)
+{
+    setTagChecked(getTagInfo(id), checked);
+}
+
+void Bookmarks::setTagChecked(TagInfo &tagInfo, bool checked)
+{
+    if (tagInfo.checked != checked)
+    {
+        tagInfo.checked = checked;
+        emit tagListChanged();
+    }
+}
+
+void Bookmarks::setTagColor(TagInfo &tagInfo, const QColor &color)
+{
+    if(!color.isValid())
+        return;
+
+    if (tagInfo.color != color)
+    {
+        tagInfo.color = color;
+        tagInfo.modified = true;
+        emit tagListChanged();
+    }
+}
+
+void Bookmarks::setTagShow(const QUuid &id, bool show)
+{
+    setTagShow(getTagInfo(id), show);
+}
+
+void Bookmarks::setTagShow(TagInfo &tagInfo, bool show)
+{
+    if (tagInfo.show != show)
+    {
+        tagInfo.show = show;
+        emit tagListFilter();
+    }
 }
 
 bool Bookmarks::save()
 {
     if (!m_bmModified)
-        return true;
+    {
+        {
+            const auto it_end = m_tagList.cend();
+            for (auto it = m_tagList.begin(); it != it_end; it++)
+            {
+                if (it->modified)
+                {
+                    m_bmModified = true;
+                    it->modified = false;
+                    break;
+                }
+            }
+        }
+        if (!m_bmModified)
+        {
+            const auto it_end = m_bookmarkList.cend();
+            for (auto it = m_bookmarkList.begin(); it != it_end; it++)
+            {
+                if (it->modified)
+                {
+                    m_bmModified = true;
+                    it->modified = false;
+                    break;
+                }
+            }
+        }
+        if (!m_bmModified)
+            return true;
+    }
 
     QTemporaryFile tmp;
     if(tmp.open())
     {
+        m_bmModified = false;
         QTextStream stream(&tmp);
 
         stream << QString("# Tag name").leftJustified(FIELD_WIDTH_TAG) << CSV_SEPARATOR2 <<
@@ -410,6 +564,8 @@ bool Bookmarks::save()
 
         stream << endl;
 
+        TagInfo &taggedTag = findOrAddTag(TagInfo::UNTAGGED);
+
         for (int ib = 0; ib < bookmarkSize; ib++)
         {
             const BookmarkInfo &info = m_bookmarkList[ib];
@@ -422,14 +578,18 @@ bool Bookmarks::save()
             int justify = 0;
             for(int i = 0; i < tagssize; ++i)
             {
-                if(i != 0)
+                if (info.tags[i] == &taggedTag)
+                    continue;
+
+                QString s = csvquote(info.tags[i]->name);
+                stream << s;
+                justify += s.length();
+
+                if(i < tagssize - 1)
                 {
                     stream << TAG_SEPARATOR;
                     justify += TAG_SEPARATOR.length();
                 }
-                QString s = csvquote(info.tags[i]->name);
-                stream << s;
-                justify += s.length();
             }
 
             if (usedInfoField)
@@ -449,6 +609,7 @@ bool Bookmarks::save()
     else
     {
         qCritical("Bookmarks: Failed to save: Could not open temporary file");
+        m_bmModified = true; // reset modified state
         return false;
     }
 
@@ -456,11 +617,13 @@ bool Bookmarks::save()
     if (QFile::exists(bckfile) && !QFile::remove(bckfile))
     {
         qCritical("Bookmarks: Failed to save: Could not remove backup file");
+        m_bmModified = true; // reset modified state
         return false;
     }
     if (QFile::exists(m_bookmarksFile) && !QFile::rename(m_bookmarksFile, bckfile))
     {
         qCritical("Bookmarks: Failed to save: Could not create backup file");
+        m_bmModified = true; // reset modified state
         return false;
     }
 
@@ -469,6 +632,7 @@ bool Bookmarks::save()
         if (!QFile::copy(bckfile, m_bookmarksFile))
             qCritical("Bookmarks: Restore of backup failed");
         qCritical("Bookmarks: Failed to save: Could not copy temporary file");
+        m_bmModified = true; // reset modified state
         return false;
     }
 
@@ -480,33 +644,21 @@ bool Bookmarks::save()
     return true;
 }
 
-void Bookmarks::setConfigDir(const QString &cfg_dir)
+Bookmarks::Bookmarks() :
+    m_bmModified(false)
 {
-    m_bookmarksFile = cfg_dir + "/bookmarks.csv";
-#ifndef QT_NO_DEBUG_OUTPUT
-    qDebug() << "BookmarksFile is " << m_bookmarksFile;
-#endif
+    m_tagList.append(findOrAddTag(TagInfo::UNTAGGED));
+    m_saveTimer = new QTimer(this);
+    m_saveTimer->setInterval(SAVE_TIMER_INTERVAL_MS);
+    connect(m_saveTimer, SIGNAL(timeout()), this, SLOT(save()));
+    m_saveTimer->start();
 }
 
-bool Bookmarks::setTagActive(const QString &tagName, bool is_active)
+Bookmarks::~Bookmarks()
 {
-    TagInfo *tagInfo = nullptr;
-    getTagInfo(tagInfo, tagName);
-    if (!tagInfo)
-        return false;
-
-    tagInfo->active = is_active;
-
-    emit bookmarksChanged();
-    emit tagListChanged();
-    return true;
-}
-
-Bookmarks::Bookmarks()
-{
-    m_bmModified = false;
-    TagInfo tag(TagInfo::UNTAGGED);
-    m_tagList.append(tag);
+    m_saveTimer->stop();
+    delete m_saveTimer;
+    save();
 }
 
 QString Bookmarks::csvquote(const QString &unquoted, int minlength)

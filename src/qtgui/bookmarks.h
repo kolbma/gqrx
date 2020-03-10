@@ -28,6 +28,7 @@
 #include <QMap>
 #include <QObject>
 #include <QStringList>
+#include <QTimer>
 #include <QUuid>
 
 /**
@@ -38,13 +39,32 @@ struct TagInfo
     static const QColor DEFAULT_COLOR;
     static const QString UNTAGGED;
 
-    bool    active;
+    bool    checked; // temporary sync usage for updating BookmarkInfo
     QColor  color;
     QUuid   id;
+    bool    modified;
     QString name;
+    bool    show;  // filter
 
-    TagInfo();
-    TagInfo(const QString &name);
+    /**
+     * @brief TagInfo
+     * @param modified detects need for save
+     */
+    TagInfo(bool modified = true);
+
+    /**
+     * @brief TagInfo
+     * @param id
+     * @param modified detects need for save
+     */
+    TagInfo(const QUuid &id, bool modified = true);
+
+    /**
+     * @brief TagInfo
+     * @param name
+     * @param modified detects need for save
+     */
+    TagInfo(const QString &name, bool modified = true);
 
     /**
      * @brief compares member name
@@ -77,11 +97,35 @@ struct BookmarkInfo
     QUuid   id;
     QString info;
     qint64  frequency;
-    QString name;
     QString modulation;
-    QList<TagInfo*> tags;
+    bool    modified;
+    QString name;
+    QList<TagInfo *> tags;
 
-    BookmarkInfo();
+    /**
+     * @brief BookmarkInfo
+     * @param modified detects need for save
+     */
+    BookmarkInfo(bool modified = true);
+
+    /**
+     * @brief add TagInfo by tagInfo pointer
+     * @param tagInfo
+     */
+    void addTagInfo(TagInfo *const tagInfo);
+
+    /**
+     * @brief get tags without TagInfo::UNTAGGED
+     * @return QList<TagInfo *>
+     */
+    QList<TagInfo *> getFilteredTags();
+
+    /**
+     * @brief remove TagInfo by pointer
+     * @param tagInfo
+     * @return
+     */
+    bool removeTagInfo(TagInfo *const tagInfo);
 
     /**
      * @brief compares frequency
@@ -104,8 +148,11 @@ struct BookmarkInfo
      */
     bool operator!=(const BookmarkInfo &other) const;
 
+    /**
+     * @brief get Color of first active tag
+     * @return
+     */
     const QColor &getColor() const;
-    bool isActive() const;
 };
 
 /**
@@ -114,11 +161,14 @@ struct BookmarkInfo
 class Bookmarks : public QObject
 {
     Q_OBJECT
+
 public:
     static const QChar CSV_QUOTE;
     static const QString CSV_SEPARATOR;
     static const QString CSV_SEPARATOR2;
+    static const int ID_ROLE;
     static const QString TAG_SEPARATOR;
+    static const QString TAG_SEPARATOR2;
 
     /**
      * @brief lazy loaded singleton instance of Bookmarks
@@ -126,34 +176,59 @@ public:
      */
     static Bookmarks &instance();
 
-    void add(const BookmarkInfo &info);
+    /**
+     * @brief add bookmark (optional adding UNTAGGED)
+     * @param info
+     */
+    void add(BookmarkInfo &info);
+
+    /**
+     * @brief add TagInfo by QUuid to bookmark
+     * @param bookmark
+     * @param id
+     * @return
+     */
+    bool addTagInfo(BookmarkInfo &bookmark, const QUuid &id);
+
+    /**
+     * @brief add TagInfo
+     * @param tagInfo
+     * @return
+     */
+    bool addTagInfo(const TagInfo &tagInfo);
+
+    /**
+     * @brief how many bookmarks there are
+     * @return
+     */
+    int count() { return m_bookmarkList.count(); }
 
     /**
      * @brief find or add a tag with internal trimmed tagName
      * @param tagName (need not to be trimmed)
-     * @return  TagInfo&
+     * @param markModified - marks modified for save
+     * @return TagInfo&
      */
-    TagInfo &findOrAddTag(const QString &tagName);
+    TagInfo &findOrAddTag(const QString &tagName, bool markModified = true);
 
     BookmarkInfo &getBookmark(int i) { return m_bookmarkList[i]; }
-    QList<BookmarkInfo> getBookmarksInRange(qint64 low, qint64 high);
+    QList<const BookmarkInfo *> getBookmarksInRange(qint64 low, qint64 high) const;
+
+    const QList<TagInfo> &getTagList() const { return m_tagList; }
 
     /**
-     * @brief get index for internal trimmed tagName
-     * @param tagName (need not to be trimmed)
-     * @return int index
+     * @brief getTagInfo by UUid
+     * @param id
+     * @return const TagInfo&
      */
-    int getTagIndex(const QString &tagName);
-
-    QList<TagInfo> getTagList() { return  QList<TagInfo>(m_tagList); }
+    const TagInfo &getTagInfo(const QUuid &id) const;
 
     /**
-     * @brief get pointer to TagInfo by tagName
-     * @param tagInfo to retrieve
-     * @param tagName (need not to be trimmed)
-     * @return
+     * @brief getTagInfo by UUid
+     * @param id
+     * @return TagInfo&
      */
-    void getTagInfo(const TagInfo *tagInfo, const QString &tagName) const;
+    TagInfo &getTagInfo(const QUuid &id);
 
     /**
      * @brief Loads special formatted data with semikolon and comma separator
@@ -163,23 +238,22 @@ public:
      */
     bool load();
 
-
     void remove(int index);
 
     /**
-     * @brief remove tag for internal trimmed tagName
-     * @param tagName (need not to be trimmed)
-     * @return true on success
+     * @brief remove TagInfo by QUuid from bookmark
+     * @param bookmark
+     * @param id
+     * @return
      */
-    bool removeTag(const QString &tagName);
+    bool removeTagInfo(BookmarkInfo &bookmark, const QUuid &id);
 
     /**
-     * @brief Safe save with temporary file, backup and replacement
-     * @details does quoting of separator chars for some text fields
-     * @see csvquote()
-     * @return true on success
+     * @brief remove TagInfo by QUuid
+     * @param &tagInfo
+     * @return
      */
-    bool save();
+    bool removeTagInfo(TagInfo &tagInfo);
 
     /**
      * @brief setConfigDir to know where to save()
@@ -188,29 +262,72 @@ public:
     void setConfigDir(const QString &cfg_dir);
 
     /**
-     * @brief set active state of tag
-     * @param tagName
-     * @param is_active
-     * @return true if tag found and set, else false
+     * @brief setModified
+     * @param modified
      */
-    bool setTagActive(const QString &tagName, bool is_active);
+    void setModified(bool modified = true);
 
-    int size() { return m_bookmarkList.size(); }
+    /**
+     * @brief set checked state of tag
+     * @param id
+     * @param checked
+     */
+    void setTagChecked(const QUuid &id, bool checked);
+
+    /**
+     * @brief set checked state of tag
+     * @param tagInfo
+     * @param checked
+     */
+    void setTagChecked(TagInfo &tagInfo, bool checked);
+
+    /**
+     * @brief setTagColor
+     * @param tagInfo
+     * @param color
+     */
+    void setTagColor(TagInfo &tagInfo, const QColor &color);
+
+    /**
+     * @brief set show state of tag
+     * @param id
+     * @param show
+     */
+    void setTagShow(const QUuid &id, bool show);
+
+    /**
+     * @brief set show state of tag
+     * @param tagInfo
+     * @param show
+     */
+    void setTagShow(TagInfo &tagInfo, bool show);
+
+public slots:
+    /**
+     * @brief Safe save with temporary file, backup and replacement
+     * @details does quoting of separator chars for some text fields
+     * @see csvquote()
+     * @return true on success
+     */
+    bool save();
 
 signals:
-    void bookmarksChanged(void);
-    void tagListChanged(void);
+    void bookmarksChanged();
+    void tagListChanged();
+    void tagListFilter();
 
 private:
     bool                 m_bmModified;
     QList<BookmarkInfo>  m_bookmarkList;
     QString              m_bookmarksFile;
+    QTimer               *m_saveTimer;
     QList<TagInfo>       m_tagList;
 
     /**
      * @brief Bookmarks is lazy initialized static singleton instance
      */
     Bookmarks();
+    ~Bookmarks();
 
     /**
      * @brief Decides if quoting is needed and returns a safe string
@@ -229,6 +346,7 @@ private:
      * @return empty list if fieldCount does not match, filled list on success
      */
     static QStringList csvsplit(const QString &text, int fieldCount, const QString &separator = CSV_SEPARATOR);
+
 };
 
 #endif // BOOKMARKS_H
