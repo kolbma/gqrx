@@ -25,21 +25,10 @@
 #include <QColorDialog>
 #include <QHeaderView>
 #include <QMenu>
+#include <QMessageBox>
 
 #include "bookmarks.h"
 #include "bookmarkstaglist.h"
-
-QString BookmarksTagList::toString(const QList<TagInfo *> &tagList)
-{
-    QString s;
-    for (auto it = tagList.cbegin(), it_begin = it, it_end = tagList.cend(); it != it_end; it++)
-    {
-        if (it != it_begin)
-            s += Bookmarks::TAG_SEPARATOR2;
-        s += (*it)->name;
-    }
-    return s;
-}
 
 BookmarksTagList::BookmarksTagList(QWidget *parent, bool bShowUntagged, Variant variant)
     : QTableWidget(parent),
@@ -89,7 +78,11 @@ QList<TagInfo *> BookmarksTagList::getCheckedTags()
         }
         else if (m_variant == Variant::Selection)
         {
-            tagInfo.checked = (pItem->checkState() == Qt::Checked);
+            if (tagInfo.checked != (pItem->checkState() == Qt::Checked))
+            {
+                tagInfo.checked = (pItem->checkState() == Qt::Checked);
+                tagInfo.modified = true;
+            }
             if (tagInfo.checked)
                 tags.append(&tagInfo);
         }
@@ -157,10 +150,10 @@ void BookmarksTagList::addTag(const QUuid &id, const QString &name, Qt::CheckSta
 
 void BookmarksTagList::addNewTag()
 {
-    TagInfo tagInfo("*enter tag name*");
+    TagInfo tagInfo;
     m_bookmarks->addTagInfo(tagInfo);
 
-    addTag(tagInfo.id, tagInfo.name);
+    addTag(tagInfo.id, "*enter tag name*", tagInfo.checked ? Qt::Checked : Qt::Unchecked);
     scrollToBottom();
 
     const int rowcount = rowCount();
@@ -182,10 +175,14 @@ void BookmarksTagList::deleteSelectedTag()
     if(selected.empty())
         return;
 
-    const int iRow = selected.first().row();
-    const QTableWidgetItem *pItem = item(iRow, 1);
-    auto &tagInfo = getTagInfo(pItem);
-    m_bookmarks->removeTagInfo(tagInfo);
+    if (QMessageBox::question(this, "Delete tag", "Really delete?",
+                              QMessageBox::Yes | QMessageBox::No) == QMessageBox::Yes)
+    {
+        const int iRow = selected.first().row();
+        const QTableWidgetItem *pItem = item(iRow, 1);
+        auto &tagInfo = getTagInfo(pItem);
+        m_bookmarks->removeTagInfo(tagInfo);
+    }
 }
 
 void BookmarksTagList::deselectAll()
@@ -229,9 +226,13 @@ void BookmarksTagList::on_itemChanged(QTableWidgetItem *item)
 {
     const QString text(item->text().trimmed());
     auto &tagInfo = getTagInfo(item);
-    if (m_blockSlot || item->column() == 0 || text.isEmpty() ||
-            tagInfo.name == text || tagInfo.name == TagInfo::UNTAGGED)
+    if (m_blockSlot || item->column() == 0 || tagInfo.name == text)
     {
+        return;
+    }
+    else if (text.isEmpty() || tagInfo.name == TagInfo::UNTAGGED)
+    {
+        item->setText(tagInfo.name);
         return;
     }
 
@@ -246,6 +247,7 @@ void BookmarksTagList::on_itemChanged(QTableWidgetItem *item)
     tagInfo.name = text;
     tagInfo.modified = true;
     emit m_bookmarks->tagListChanged();
+    emit m_bookmarks->bookmarksChanged();
 }
 
 void BookmarksTagList::renameSelectedTag()

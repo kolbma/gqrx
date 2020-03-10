@@ -36,8 +36,6 @@ class BookmarksTagList : public QTableWidget
     Q_OBJECT
 
 public:
-    static QString toString(const QList<TagInfo *> &tagList);
-
     enum Variant
     {
         Filter,
@@ -45,15 +43,18 @@ public:
     };
 
     explicit BookmarksTagList(QWidget *parent = 0, bool bShowUntagged = true, Variant variant = Variant::Filter);
+
+    /**
+     * @brief get checked tags of filter or selection
+     * @return
+     */
     QList<TagInfo *> getCheckedTags();
-    //QString getSelectedTagsAsString();
 
     /**
      * @brief set checked/unchecked based on active state
      * @param tags
      */
     void setTagsCheckState(const QList<TagInfo*> &tags);
-    //void setSelectedTagsAsString(const QString &strTags);
 
 public slots:
     void addTag(const QUuid &id, const QString &name, Qt::CheckState checkstate = Qt::Checked,
