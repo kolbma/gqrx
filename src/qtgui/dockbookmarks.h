@@ -57,10 +57,8 @@ public:
     explicit DockBookmarks(QWidget *parent = 0);
     ~DockBookmarks();
 
-    void updateBookmarks();
-    void updateTags();
-
 signals:
+    void bookmarkModified();
     void newBookmarkActivated(qint64, QString, int);
     void newBookmarkAdd();
 
@@ -71,8 +69,8 @@ private:
     BookmarksTableModel        *bookmarksTableModel;
     QMenu                      *contextmenu;
     ComboBoxDelegateModulation *delegateModulation;
+    Bookmarks                  *m_bookmarks;
     qint64                      m_currentFrequency;
-    bool                        m_updating;
     Ui::DockBookmarks          *ui;
 
     bool eventFilter(QObject* object, QEvent* event);
@@ -83,7 +81,6 @@ private slots:
     void addBookmark();
     bool deleteSelectedBookmark();
     bool editSelectedField();
-    //void on_tableWidgetTagList_itemChanged(QTableWidgetItem* item);
     void onDataChanged(const QModelIndex &topLeft, const QModelIndex &bottomRight);
     void showContextMenu(const QPoint &pos);
     void tagsClicked(const QModelIndex &index);
