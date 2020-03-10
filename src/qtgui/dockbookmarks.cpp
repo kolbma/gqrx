@@ -179,7 +179,7 @@ bool DockBookmarks::eventFilter(QObject* object, QEvent* event)
 void DockBookmarks::showTagsSelector(int row, int /*column*/)
 {
     const int idx = bookmarksTableModel->getBookmarksIndexForRow(row);
-    BookmarkInfo& bmi = m_bookmarks->getBookmark(idx);
+    BookmarkInfo& info = m_bookmarks->getBookmark(idx);
 
     // Create and show the Dialog for a new Bookmark.
     QDialog dialog(this);
@@ -187,7 +187,7 @@ void DockBookmarks::showTagsSelector(int row, int /*column*/)
 
     BookmarksTagList *taglist = new BookmarksTagList(&dialog, false, BookmarksTagList::Variant::Selection);
     taglist->updateTags();
-    taglist->setTagsCheckState(bmi.tags);
+    taglist->setTagsCheckState(info.tags);
     connect(m_bookmarks, SIGNAL(tagListChanged()), taglist, SLOT(updateTags()));
 
     QDialogButtonBox* buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok
@@ -201,7 +201,7 @@ void DockBookmarks::showTagsSelector(int row, int /*column*/)
 
     if (dialog.exec())
     {
-        bmi.tags = taglist->getCheckedTags();
+        info.setTags(taglist->getCheckedTags()); // modified for save is detected with tags in getCheckedTags
         emit m_bookmarks->bookmarksChanged();
     }
 }
