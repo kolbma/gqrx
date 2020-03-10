@@ -1289,17 +1289,17 @@ void CPlotter::drawOverlay()
         static const int slant = 5;
         static const int levelHeight = fontHeight + 5;
         static const int nLevels = 10;
-        QList<BookmarkInfo> bookmarks = Bookmarks::instance().getBookmarksInRange(m_CenterFreq + m_FftCenter - m_Span / 2,
-                                                                             m_CenterFreq + m_FftCenter + m_Span / 2);
+        auto bookmarks = Bookmarks::instance().getBookmarksInRange(m_CenterFreq + m_FftCenter - m_Span / 2,
+                                                                   m_CenterFreq + m_FftCenter + m_Span / 2);
         int tagEnd[nLevels] = {0};
-        for (int i = 0; i < bookmarks.size(); i++)
+        for (int i = 0; i < bookmarks.count(); i++)
         {
-            x = xFromFreq(bookmarks[i].frequency);
+            x = xFromFreq(bookmarks[i]->frequency);
 
 #if defined(_WIN16) || defined(_WIN32) || defined(_WIN64)
-            int nameWidth = fm.width(bookmarks[i].name);
+            int nameWidth = fm.width(bookmarks[i]->name);
 #else
-            int nameWidth = fm.boundingRect(bookmarks[i].name).width();
+            int nameWidth = fm.boundingRect(bookmarks[i]->name).width();
 #endif
 
             int level = 0;
@@ -1310,9 +1310,11 @@ void CPlotter::drawOverlay()
                 level = 0;
 
             tagEnd[level] = x + nameWidth + slant - 1;
-            m_BookmarkTags.append(qMakePair<QRect, qint64>(QRect(x, level * levelHeight, nameWidth + slant, fontHeight), bookmarks[i].frequency));
+            m_BookmarkTags.append(qMakePair<QRect, qint64>(QRect(x, level * levelHeight,
+                                                                 nameWidth + slant, fontHeight),
+                                                           bookmarks[i]->frequency));
 
-            QColor color = QColor(bookmarks[i].getColor());
+            QColor color = QColor(bookmarks[i]->getColor());
             color.setAlpha(0x60);
             // Vertical line
             painter.setPen(QPen(color, 1, Qt::DashLine));
@@ -1331,7 +1333,7 @@ void CPlotter::drawOverlay()
             painter.setPen(QPen(color, 2, Qt::SolidLine));
             painter.drawText(x + slant, level * levelHeight, nameWidth,
                              fontHeight, Qt::AlignVCenter | Qt::AlignHCenter,
-                             bookmarks[i].name);
+                             bookmarks[i]->name);
         }
     }
 
