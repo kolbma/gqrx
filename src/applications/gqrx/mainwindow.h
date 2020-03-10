@@ -199,6 +199,7 @@ private slots:
     void setRdsDecoder(bool checked);
 
     /* Bookmarks */
+    void onBookmarkModified();
     void onBookmarkActivated(qint64 freq, QString demod, int bandwidth);
 
     /* menu and toolbar actions */
@@ -217,7 +218,7 @@ private slots:
     void on_actionRemoteProtocol_triggered();
     void on_actionAbout_triggered();
     void on_actionAboutQt_triggered();
-    void showNewBookmarkAdd();
+    void on_actionAddBookmark_triggered();
 
 
     /* window close signals */
