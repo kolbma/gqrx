@@ -73,7 +73,7 @@ QVariant BookmarksTableModel::headerData(int section, Qt::Orientation orientatio
 
 QVariant BookmarksTableModel::data(const QModelIndex &index, int role) const
 {
-    BookmarkInfo &info = *m_bookmarkList[index.row()];
+    const BookmarkInfo &info = *m_bookmarkList[index.row()];
 
     if (role == Qt::BackgroundColorRole)
     {
@@ -94,7 +94,7 @@ QVariant BookmarksTableModel::data(const QModelIndex &index, int role) const
         case COL_BANDWIDTH:
             return (info.bandwidth == 0) ? QVariant("") : QVariant(info.bandwidth);
         case COL_TAGS:
-            return BookmarksTagList::toString(info.getFilteredTags());
+            return info.tagsStr;
         case COL_INFO:
             return info.info;
         }
@@ -154,48 +154,65 @@ bool BookmarksTableModel::setData(const QModelIndex &index, const QVariant &valu
         {
         case COL_FREQUENCY:
             {
-                info.frequency = value.toLongLong();
-                emit dataChanged(index, index);
+                const auto val = value.toLongLong();
+                if (info.frequency != val)
+                {
+                    info.frequency = val;
+                    emit dataChanged(index, index);
+                }
             }
             break;
         case COL_NAME:
             {
-                info.name = value.toString();
-                emit dataChanged(index, index);
-                return true;
+                const auto val = value.toString();
+                if (info.name != val)
+                {
+                    info.name = val;
+                    emit dataChanged(index, index);
+                }
             }
             break;
         case COL_MODULATION:
             {
                 // may not contain a comma because no csvsplit()
                 Q_ASSERT(!value.toString().contains(Bookmarks::CSV_SEPARATOR));
-                if(DockRxOpt::IsModulationValid(value.toString()))
+                const auto val = value.toString();
+                if (info.modulation != val && DockRxOpt::IsModulationValid(val))
                 {
-                    info.modulation = value.toString();
+                    info.modulation = val;
                     emit dataChanged(index, index);
                 }
             }
             break;
         case COL_BANDWIDTH:
             {
-                info.bandwidth = value.toInt();
-                emit dataChanged(index, index);
+                const auto val = value.toInt();
+                if (info.bandwidth != val)
+                {
+                    info.bandwidth = val;
+                    emit dataChanged(index, index);
+                }
             }
             break;
         case COL_TAGS:
             {
                 // info.tags should be set by dialog
-                emit dataChanged(index, index);
-                return true;
+                if (info.modified)
+                {
+                    emit dataChanged(index, index);
+                }
             }
             break;
         case COL_INFO:
             {
-                info.info = value.toString();
-                emit dataChanged(index, index);
-                return true;
+                const auto val = value.toString();
+                if (info.info != val)
+                {
+                    info.info = val;
+                    emit dataChanged(index, index);
+                }
             }
-        break;
+            break;
         }
         return true; // return true means success
     }
@@ -215,6 +232,7 @@ void BookmarksTableModel::update()
             if(info.tags[iTag]->show)
             {
                 m_mapRowToBookmarksIndex[iRow] = iBookmark; // TODO does this work mit sort?
+                info.setTags(info.tags); // just update tags
                 m_bookmarkList.append(&info);
                 ++iRow;
                 break;
