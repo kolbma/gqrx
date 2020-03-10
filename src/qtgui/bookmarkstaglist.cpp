@@ -124,6 +124,7 @@ void BookmarksTagList::setTagsCheckState(const QList<TagInfo*> &tags)
                 {
                     // we get here only the BookmarkInfo tags and can set to true
                     checked = true;
+                    (*it)->checked = true;
                     break;
                 }
                 Q_ASSERT(false);
@@ -133,22 +134,6 @@ void BookmarksTagList::setTagsCheckState(const QList<TagInfo*> &tags)
     }
     setSortingEnabled(true); // TODO sorting
 }
-
-#if 0
-void BookmarksTagList::setSelectedTagsAsString(const QString &strTags)
-{
-    QStringList list = strTags.split(",");
-    int iRows = rowCount();
-    for(int i=0; i < iRows; ++i)
-    {
-        QTableWidgetItem *pItem = item(i, 1);
-        QString name = pItem->text();
-        bool bChecked = list.contains(name);
-        pItem->setCheckState(bChecked ? Qt::Checked : Qt::Unchecked);
-    }
-    setSortingEnabled(true);
-}
-#endif
 
 void BookmarksTagList::addTag(const QUuid &id, const QString &name, Qt::CheckState checkstate, const QColor &color)
 {
