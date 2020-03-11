@@ -4,6 +4,7 @@
  *           http://gqrx.dk/
  *
  * Copyright 2014 Stefano Leucci, Christian Lindner DL2VCL.
+ * Copyright 2020 Markus Kolb
  *
  * Gqrx is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -20,297 +21,354 @@
  * the Free Software Foundation, Inc., 51 Franklin Street,
  * Boston, MA 02110-1301, USA.
  */
-#include "bookmarkstaglist.h"
-#include "bookmarks.h"
-#include <QColorDialog>
-#include <stdio.h>
-#include <QMenu>
-#include <QHeaderView>
 
-BookmarksTagList::BookmarksTagList(QWidget *parent, bool bShowUntagged )
-    : QTableWidget(parent)
-    , m_bUpdating(false)
-    , m_bShowUntagged(bShowUntagged)
+#include <QColorDialog>
+#include <QHeaderView>
+#include <QMenu>
+#include <QMessageBox>
+
+#include "bookmarks.h"
+#include "bookmarkstaglist.h"
+
+BookmarksTagList::BookmarksTagList(QWidget *parent, bool bShowUntagged, Variant variant)
+    : QTableWidget(parent),
+      m_bookmarks(&Bookmarks::instance()),
+      m_bShowUntagged(bShowUntagged),
+      m_variant(variant)
 {
-    connect(this, SIGNAL(cellClicked(int,int)),
-            this, SLOT(on_cellClicked(int,int)));
+    connect(this, SIGNAL(cellClicked(int, int)), this, SLOT(on_cellClicked(int, int)));
+    connect(this, SIGNAL(itemChanged(QTableWidgetItem *)), this, SLOT(on_itemChanged(QTableWidgetItem *)));
 
     // right click menu
     setContextMenuPolicy(Qt::CustomContextMenu);
     connect(this, SIGNAL(customContextMenuRequested(const QPoint&)),
-            this, SLOT(ShowContextMenu(const QPoint&)));
+            this, SLOT(showContextMenu(const QPoint&)));
 
-    horizontalHeader()->setVisible(false);
+    //horizontalHeader()->setVisible(false);
+    horizontalHeader()->setStretchLastSection(true);
+
     verticalHeader()->setVisible(false);
+
     setColumnCount(2);
     setColumnWidth(0, 20);
-    horizontalHeader()->setStretchLastSection(true);
+
+    setHorizontalHeaderItem(0, new QTableWidgetItem(""));
+    setHorizontalHeaderItem(1, new QTableWidgetItem("Tags"));
+
     setSelectionMode(QAbstractItemView::SingleSelection);
     setSelectionBehavior(QAbstractItemView::SelectRows);
-    setSortingEnabled(true);
+
+    sortItems(1);
 }
 
-void BookmarksTagList::on_cellClicked(int row, int column)
+QList<TagInfo *> BookmarksTagList::getCheckedTags()
 {
-    if(column==0)
+    QList<TagInfo *> tags;
+
+    int iRows = rowCount();
+    for(int i = 0; i < iRows; ++i)
     {
-        changeColor(row, column);
-    }
-    if(column==1)
-    {
-        toggleCheckedState(row, column);
-    }
-}
-
-void BookmarksTagList::changeColor(int row, int /*column*/)
-{
-    TagInfo &info = Bookmarks::Get().findOrAddTag(item(row, 1)->text());
-    QColor color = QColorDialog::getColor(info.color, this);
-
-    if(!color.isValid())
-        return;
-
-    info.color=color;
-    updateTags();
-    Bookmarks::Get().save();
-}
-
-void BookmarksTagList::toggleCheckedState(int row, int column)
-{
-    QTableWidgetItem* p = item(row,column);
-    if(p->checkState()==Qt::Unchecked)
-    {
-        p->setCheckState(Qt::Checked);
-    }
-    else
-    {
-        p->setCheckState(Qt::Unchecked);
-    }
-}
-
-void BookmarksTagList::updateTags()
-{
-    m_bUpdating = true;
-
-    // Remember which items were unchecked.
-    QStringList unchecked;
-    for(int i=0; i<rowCount(); i++)
-    {
-        if(item(i,1)->checkState()==Qt::Unchecked)
-            unchecked.append(item(i,1)->text());
-    }
-
-    // Get current List of Tags.
-    QList<TagInfo> newTags = Bookmarks::Get().getTagList();
-    if(!m_bShowUntagged)
-    {
-        for(int i=0; i<newTags.size(); ++i)
+        QTableWidgetItem *pItem = item(i, 1);
+        const QUuid id = pItem->data(Bookmarks::ID_ROLE).value<QUuid>();
+        auto &tagInfo = m_bookmarks->getTagInfo(id);
+        if (m_variant == Variant::Filter)
         {
-            TagInfo& taginfo = newTags[i];
-            if(taginfo.name.compare(TagInfo::strUntagged)==0)
+            tagInfo.show = (pItem->checkState() == Qt::Checked);
+            tags.append(&tagInfo);
+        }
+        else if (m_variant == Variant::Selection)
+        {
+            if (tagInfo.checked != (pItem->checkState() == Qt::Checked))
             {
-                newTags.removeAt(i);
-                break;
+                tagInfo.checked = (pItem->checkState() == Qt::Checked);
+                tagInfo.modified = true;
+            }
+            if (tagInfo.checked)
+                tags.append(&tagInfo);
+        }
+    }
+
+    if (m_variant == Variant::Selection && tags.count() == 0)
+    {
+        tags.append(&m_bookmarks->findOrAddTag(TagInfo::UNTAGGED));
+    }
+
+    return tags;
+}
+
+void BookmarksTagList::setTagsCheckState(const QList<TagInfo*> &tags)
+{
+    const int iRows = rowCount();
+    for(int i=0; i < iRows; ++i)
+    {
+        bool checked = false;
+        QTableWidgetItem *pItem = item(i, 1);
+        const QUuid id = pItem->data(Bookmarks::ID_ROLE).value<QUuid>();
+        for (auto tag : tags)
+        {
+            if (tag->id == id)
+            {
+                if (m_variant == Variant::Filter)
+                {
+                    checked = tag->show;
+                    break;
+                }
+                else if (m_variant == Variant::Selection)
+                {
+                    // we get here only the BookmarkInfo tags and can set to true
+                    checked = true;
+                    tag->checked = true;
+                    break;
+                }
+                Q_ASSERT(false);
             }
         }
+        pItem->setCheckState(checked ? Qt::Checked : Qt::Unchecked);
     }
-
-    // Rebuild List in GUI.
-    clear();
-    setSortingEnabled(false);
-    setRowCount(0);
-    for(int i=0; i<newTags.count(); i++)
-    {
-        AddTag(newTags[i].name,
-                  ( unchecked.contains(newTags[i].name) ? Qt::Unchecked : Qt::Checked ),
-                  newTags[i].color);
-    }
-    setSortingEnabled(true);
-
-    m_bUpdating = false;
 }
 
-void BookmarksTagList::setSelectedTagsAsString(const QString& strTags)
-{
-    QStringList list = strTags.split(",");
-    int iRows = rowCount();
-    for(int i=0; i<iRows; ++i)
-    {
-        QTableWidgetItem* pItem = item(i,1);
-        QString name = pItem->text();
-        bool bChecked = list.contains(name);
-        pItem->setCheckState(bChecked ? Qt::Checked : Qt::Unchecked);
-    }
-    setSortingEnabled(true);
-}
-
-void BookmarksTagList::setSelectedTags(QList<TagInfo*> tags)
-{
-    int iRows = rowCount();
-    for(int i=0; i<iRows; ++i)
-    {
-        QTableWidgetItem* pItem = item(i,1);
-        QString name = pItem->text();
-        bool bChecked = false;
-        for(QList<TagInfo*>::const_iterator it=tags.begin(), itend=tags.end(); it!=itend; ++it)
-        {
-            TagInfo* pTag = *it;
-            if(pTag->name == name) bChecked = true;
-        }
-        pItem->setCheckState(bChecked ? Qt::Checked : Qt::Unchecked);
-    }
-    setSortingEnabled(true);
-}
-
-QString BookmarksTagList::getSelectedTagsAsString()
-{
-    QString strResult;
-
-    int iRows = rowCount();
-    bool bFirst = true;
-    for(int i=0; i<iRows; ++i)
-    {
-        QTableWidgetItem* pItem = item(i,1);
-        if(pItem->checkState() == Qt::Checked)
-        {
-            if(!bFirst) strResult += ", ";
-            strResult += pItem->text();
-            bFirst = false;
-        }
-    }
-    return strResult;
-}
-
-void BookmarksTagList::ShowContextMenu(const QPoint& pos)
-{
-    QMenu* menu=new QMenu(this);
-
-    // Rename currently does not work.
-    // The problem is that after the tag name is changed in GUI
-    // you can not find the right TagInfo because you dont know
-    // the old tag name.
-    #if 0
-    // MenuItem "Rename"
-    {
-        QAction* actionRename = new QAction("Rename", this);
-        menu->addAction(actionRename);
-        connect(actionRename, SIGNAL(triggered()), this, SLOT(RenameSelectedTag()));
-    }
-    #endif
-
-    // MenuItem "Create new Tag"
-    {
-        QAction* actionNewTag = new QAction("Create new Tag", this);
-        menu->addAction(actionNewTag);
-        connect(actionNewTag, SIGNAL(triggered()), this, SLOT(AddNewTag()));
-    }
-
-    // Menu "Delete Tag"
-    {
-        QAction* actionDeleteTag = new QAction("Delete Tag", this);
-        menu->addAction(actionDeleteTag);
-        connect(actionDeleteTag, SIGNAL(triggered()), this, SLOT(DeleteSelectedTag()));
-    }
-
-    // Menu "Select All"
-    {
-        QAction* action = new QAction("Select All", this);
-        menu->addAction(action);
-        connect(action, SIGNAL(triggered()), this, SLOT(SelectAll()));
-    }
-
-    // Menu "Deselect All"
-    {
-        QAction* action = new QAction("Deselect All", this);
-        menu->addAction(action);
-        connect(action, SIGNAL(triggered()), this, SLOT(DeselectAll()));
-    }
-
-    menu->popup(viewport()->mapToGlobal(pos));
-}
-
-#if 0
-bool BookmarksTagList::RenameSelectedTag()
-{
-    QModelIndexList selected = selectionModel()->selectedRows();
-
-    if(selected.empty())
-    {
-        return true;
-    }
-
-    int iRow = selected.first().row();
-    QTableWidgetItem* pItem = item(iRow,1);bUpdating
-    editItem(pItem);
-    //Bookmarks::Get().save();
-
-    return true;
-}
-#endif
-
-void BookmarksTagList::AddNewTag()
-{
-    AddTag("*new*");
-    scrollToBottom();
-    editItem(item(rowCount()-1, 1));
-}
-
-void BookmarksTagList::AddTag(QString name, Qt::CheckState checkstate, QColor color)
+void BookmarksTagList::addTag(const QUuid &id, const QString &name, Qt::CheckState checkstate, const QColor &color)
 {
     int i = rowCount();
-    setRowCount(i+1);
+    setRowCount(i + 1);
+
+    setSortingEnabled(false);
 
     // Column 1
-    QTableWidgetItem *item = new QTableWidgetItem(name);
+    auto *item = new QTableWidgetItem(name);
+    item->setData(Bookmarks::ID_ROLE, id);
     item->setCheckState(checkstate);
     item->setFlags(Qt::ItemIsSelectable | Qt::ItemIsEditable | Qt::ItemIsEnabled);
     setItem(i, 1, item);
 
     // Column 0
     item = new QTableWidgetItem();
+    item->setData(Bookmarks::ID_ROLE, id);
     item->setFlags(Qt::ItemIsEnabled);
     item->setBackgroundColor(color);
     setItem(i, 0, item);
+
+    setSortingEnabled(true);
 }
 
-void BookmarksTagList::DeleteSelectedTag()
+void BookmarksTagList::addNewTag()
 {
-    QModelIndexList selected = selectionModel()->selectedRows();
+    TagInfo tagInfo;
+    m_bookmarks->addTagInfo(tagInfo);
+
+    addTag(tagInfo.id, "*enter tag name*", tagInfo.checked ? Qt::Checked : Qt::Unchecked);
+    scrollToBottom();
+
+    const int rowcount = rowCount();
+    const auto pItem = item(rowcount - 1, 1);
+    editItem(pItem);
+}
+
+void BookmarksTagList::changeColor(int row)
+{
+    auto &tagInfo = getTagInfo(item(row, 1));
+    const QColor color = QColorDialog::getColor(tagInfo.color, this);
+
+    m_bookmarks->setTagColor(tagInfo, color);
+}
+
+void BookmarksTagList::deleteSelectedTag()
+{
+    const QModelIndexList selected = selectionModel()->selectedRows();
     if(selected.empty())
+        return;
+
+    if (QMessageBox::question(this, "Delete tag", "Really delete?",
+                              QMessageBox::Yes | QMessageBox::No) == QMessageBox::Yes)
+    {
+        const int iRow = selected.first().row();
+        const QTableWidgetItem *pItem = item(iRow, 1);
+        auto &tagInfo = getTagInfo(pItem);
+        m_bookmarks->removeTagInfo(tagInfo);
+    }
+}
+
+void BookmarksTagList::deselectAll()
+{
+    int iRows = rowCount();
+    for(int i=0; i < iRows; ++i)
+    {
+        QTableWidgetItem *pItem = item(i, 1);
+        pItem->setCheckState(Qt::Unchecked);
+        auto &tagInfo = getTagInfo(pItem);
+        if (m_variant == Variant::Filter)
+        {
+            m_bookmarks->setTagShow(tagInfo, false);
+        }
+        else if (m_variant == Variant::Selection)
+        {
+            m_bookmarks->setTagChecked(tagInfo, false);
+        }
+    }
+}
+
+void BookmarksTagList::filterTags()
+{
+    updateTags();
+    emit m_bookmarks->bookmarksChanged();
+}
+
+void BookmarksTagList::on_cellClicked(int row, int column)
+{
+    if(column == 0)
+    {
+        changeColor(row);
+    }
+    else if(column == 1)
+    {
+        toggleCheckedState(row, column);
+    }
+}
+
+void BookmarksTagList::on_itemChanged(QTableWidgetItem *item)
+{
+    const QString text(item->text().trimmed());
+    auto &tagInfo = getTagInfo(item);
+    if (m_blockSlot || item->column() == 0 || tagInfo.name == text)
     {
         return;
     }
-    int iRow = selected.first().row();
-    QTableWidgetItem* pItem = item(iRow,1);
-    QString strTagName = pItem->text();
-    DeleteTag(strTagName);
-    return;
+    else if (text.isEmpty() || tagInfo.name == TagInfo::UNTAGGED)
+    {
+        item->setText(tagInfo.name);
+        return;
+    }
+
+    if (m_bookmarks->getTagList().indexOf(text) >= 0)
+    {
+        m_blockSlot = true;
+        item->setText(tagInfo.name);
+        m_blockSlot = false;
+        return;
+    }
+
+    tagInfo.name = text;
+    tagInfo.modified = true;
+    emit m_bookmarks->tagListChanged();
+    emit m_bookmarks->bookmarksChanged();
 }
 
-void BookmarksTagList::DeleteTag(const QString& name)
+void BookmarksTagList::renameSelectedTag()
 {
-    Bookmarks::Get().removeTag(name);
-    updateTags();
+    QModelIndexList selected = selectionModel()->selectedRows();
+
+    if(!selected.empty())
+        editItem(item(selected.first().row(), 1));
 }
 
-void BookmarksTagList::SelectAll()
+void BookmarksTagList::selectAll()
 {
     int iRows = rowCount();
-    for(int i=0; i<iRows; ++i)
+    for(int i=0; i < iRows; ++i)
     {
-        QTableWidgetItem* pItem = item(i,1);
-        QString name = pItem->text();
+        QTableWidgetItem *pItem = item(i, 1);
         pItem->setCheckState(Qt::Checked);
+        auto &tagInfo = getTagInfo(pItem);
+        if (m_variant == Variant::Filter)
+        {
+            m_bookmarks->setTagShow(tagInfo, true);
+        }
+        else if (m_variant == Variant::Selection)
+        {
+            m_bookmarks->setTagChecked(tagInfo, true);
+        }
     }
 }
 
-void BookmarksTagList::DeselectAll()
+void BookmarksTagList::showContextMenu(const QPoint &pos)
 {
-    int iRows = rowCount();
-    for(int i=0; i<iRows; ++i)
+    auto *menu = new QMenu(this);
+
+    // MenuItem "Rename"
     {
-        QTableWidgetItem* pItem = item(i,1);
-        QString name = pItem->text();
-        pItem->setCheckState(Qt::Unchecked);
+        auto *action = new QAction("Rename", this);
+        menu->addAction(action);
+        connect(action, SIGNAL(triggered()), this, SLOT(renameSelectedTag()));
     }
+
+    // MenuItem "Create new Tag"
+    {
+        auto *action = new QAction("Create new Tag", this);
+        menu->addAction(action);
+        connect(action, SIGNAL(triggered()), this, SLOT(addNewTag()));
+    }
+
+    // Menu "Delete Tag"
+    {
+        auto *action = new QAction("Delete Tag", this);
+        menu->addAction(action);
+        connect(action, SIGNAL(triggered()), this, SLOT(deleteSelectedTag()));
+    }
+
+    // Menu "Select All"
+    {
+        auto *action = new QAction("Select All", this);
+        menu->addAction(action);
+        connect(action, SIGNAL(triggered()), this, SLOT(selectAll()));
+    }
+
+    // Menu "Deselect All"
+    {
+        auto *action = new QAction("Deselect All", this);
+        menu->addAction(action);
+        connect(action, SIGNAL(triggered()), this, SLOT(deselectAll()));
+    }
+
+    menu->popup(viewport()->mapToGlobal(pos));
+}
+
+void BookmarksTagList::toggleCheckedState(int row, int column)
+{
+    const QTableWidgetItem *pItem = item(row, column);
+    auto &tagInfo = getTagInfo(pItem);
+    if (m_variant == Variant::Filter)
+    {
+        m_bookmarks->setTagShow(tagInfo, pItem->checkState() != Qt::Checked);
+    }
+    else if (m_variant == Variant::Selection)
+    {
+        m_bookmarks->setTagChecked(tagInfo, pItem->checkState() != Qt::Checked);
+    }
+}
+
+void BookmarksTagList::updateTags()
+{
+    m_blockSlot = true;
+
+    // Get current List of Tags
+    const QList<TagInfo> &tagList = m_bookmarks->getTagList();
+
+    // Rebuild List in GUI
+    clearContents();
+    setRowCount(0);
+
+    for (const auto &tag : tagList)
+    {
+        if (tag.name != TagInfo::UNTAGGED || m_bShowUntagged)
+        {
+            bool checked = false;
+            if (m_variant == Variant::Filter)
+            {
+                checked = tag.show;
+            }
+            else if (m_variant == Variant::Selection)
+            {
+                checked = tag.checked;
+            }
+            addTag(tag.id, tag.name, checked ? Qt::Checked : Qt::Unchecked, tag.color);
+        }
+    }
+
+    m_blockSlot = false;
+}
+
+inline TagInfo &BookmarksTagList::getTagInfo(const QTableWidgetItem *pItem)
+{
+    const QUuid id = pItem->data(Bookmarks::ID_ROLE).value<QUuid>();
+    return m_bookmarks->getTagInfo(id);
 }

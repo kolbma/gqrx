@@ -4,6 +4,7 @@
  *           http://gqrx.dk/
  *
  * Copyright 2013 Christian Lindner DL2VCL, Stefano Leucci.
+ * Copyright 2020 Markus Kolb
  *
  * Gqrx is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -20,28 +21,24 @@
  * the Free Software Foundation, Inc., 51 Franklin Street,
  * Boston, MA 02110-1301, USA.
  */
-#include <QFile>
-#include <QStringList>
+
 #include "bookmarks.h"
 #include "bookmarkstablemodel.h"
+#include "bookmarkstaglist.h"
 #include "dockrxopt.h"
 
-
 BookmarksTableModel::BookmarksTableModel(QObject *parent) :
-    QAbstractTableModel(parent)
+    QAbstractTableModel(parent),
+    m_bookmarks(&Bookmarks::instance())
 {
 }
 
-int BookmarksTableModel::rowCount ( const QModelIndex & /*parent*/ ) const
+int BookmarksTableModel::columnCount(const QModelIndex& /* parent */) const
 {
-    return m_Bookmarks.size();
-}
-int BookmarksTableModel::columnCount ( const QModelIndex & /*parent*/ ) const
-{
-    return 5;
+    return EColumns::COL_INFO + 1;
 }
 
-QVariant BookmarksTableModel::headerData ( int section, Qt::Orientation orientation, int role ) const
+QVariant BookmarksTableModel::headerData(int section, Qt::Orientation orientation, int role) const
 {
     if(orientation == Qt::Horizontal && role == Qt::DisplayRole)
     {
@@ -60,7 +57,10 @@ QVariant BookmarksTableModel::headerData ( int section, Qt::Orientation orientat
             return QString("Bandwidth");
             break;
         case COL_TAGS:
-            return QString("Tag");
+            return QString("Tags");
+            break;
+        case COL_INFO:
+            return QString("Info");
             break;
         }
     }
@@ -71,93 +71,146 @@ QVariant BookmarksTableModel::headerData ( int section, Qt::Orientation orientat
     return QVariant();
 }
 
-QVariant BookmarksTableModel::data ( const QModelIndex & index, int role ) const
+QVariant BookmarksTableModel::data(const QModelIndex &index, int role) const
 {
-    BookmarkInfo& info = *m_Bookmarks[index.row()];
-
-    if(role==Qt::BackgroundColorRole)
+    if (role == Qt::BackgroundColorRole)
     {
-        QColor bg(info.GetColor());
+        const BookmarkInfo &info = *m_bookmarkList[index.row()];
+        QColor bg(info.getColor());
         bg.setAlpha(0x60);
         return bg;
     }
-    else if(role == Qt::DisplayRole || role==Qt::EditRole)
+    else if(role == Qt::DisplayRole || role == Qt::EditRole)
     {
+        const BookmarkInfo &info = *m_bookmarkList[index.row()];
         switch(index.column())
         {
         case COL_FREQUENCY:
-                return info.frequency;
+            return info.frequency;
         case COL_NAME:
-                return (role==Qt::EditRole)?QString(info.name):info.name;
+            return (role == Qt::EditRole) ? QString(info.name) : info.name;
         case COL_MODULATION:
-                return info.modulation;
+            return info.modulation;
         case COL_BANDWIDTH:
-            return (info.bandwidth==0)?QVariant(""):QVariant(info.bandwidth);
-         case COL_TAGS:
-            QString strTags;
-            for(int iTag=0; iTag<info.tags.size(); ++iTag)
-            {
-                if(iTag!=0)
-                {
-                    strTags.append(",");
-                }
-                TagInfo& tag = *info.tags[iTag];
-                strTags.append(tag.name);
-            }
-            return strTags;
+            return (info.bandwidth == 0) ? QVariant("") : QVariant(info.bandwidth);
+        case COL_TAGS:
+            return info.tagsStr;
+        case COL_INFO:
+            return info.info;
         }
+    }
+    else if (role == Bookmarks::ID_ROLE)
+    {
+        const BookmarkInfo &info = *m_bookmarkList[index.row()];
+        return info.id;
     }
     return QVariant();
 }
 
+Qt::ItemFlags BookmarksTableModel::flags(const QModelIndex &index) const
+{
+    Qt::ItemFlags flags = 0;
+
+    switch(index.column())
+    {
+    case COL_FREQUENCY:
+        flags = Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsEditable;
+        break;
+    case COL_NAME:
+        flags = Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsEditable;
+        break;
+    case COL_BANDWIDTH:
+        flags = Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsEditable;
+        break;
+    case COL_MODULATION:
+        flags = Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsEditable;
+        break;
+    case COL_TAGS:
+        flags = Qt::ItemIsEnabled | Qt::ItemIsSelectable;
+        break;
+    case COL_INFO:
+        flags = Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsEditable;
+        break;
+    }
+    return flags;
+}
+
+const BookmarkInfo *BookmarksTableModel::getBookmark(int index) const
+{
+    return m_bookmarkList[index];
+}
+
+int BookmarksTableModel::rowCount(const QModelIndex& /* parent */) const
+{
+    return m_bookmarkList.count();
+}
+
 bool BookmarksTableModel::setData(const QModelIndex &index, const QVariant &value, int role)
 {
-    if(role==Qt::EditRole)
+    if(role == Qt::EditRole)
     {
-        BookmarkInfo &info = *m_Bookmarks[index.row()];
+        BookmarkInfo &info = *m_bookmarkList[index.row()];
         switch(index.column())
         {
         case COL_FREQUENCY:
             {
-                info.frequency = value.toLongLong();
-                emit dataChanged(index, index);
+                const auto val = value.toLongLong();
+                if (info.frequency != val)
+                {
+                    info.frequency = val;
+                    emit dataChanged(index, index);
+                }
             }
             break;
         case COL_NAME:
             {
-                info.name = value.toString();
-                emit dataChanged(index, index);
-                return true;
+                const auto val = value.toString();
+                if (info.name != val)
+                {
+                    info.name = val;
+                    emit dataChanged(index, index);
+                }
             }
             break;
         case COL_MODULATION:
             {
-                Q_ASSERT(!value.toString().contains(";")); // may not contain a comma because tablemodel is saved as comma-separated file (csv).
-                if(DockRxOpt::IsModulationValid(value.toString()))
+                // may not contain a comma because no csvsplit()
+                Q_ASSERT(!value.toString().contains(Bookmarks::CSV_SEPARATOR));
+                const auto val = value.toString();
+                if (info.modulation != val && DockRxOpt::IsModulationValid(val))
                 {
-                    info.modulation = value.toString();
+                    info.modulation = val;
                     emit dataChanged(index, index);
                 }
             }
             break;
         case COL_BANDWIDTH:
             {
-                info.bandwidth = value.toInt();
-                emit dataChanged(index, index);
+                const auto val = value.toInt();
+                if (info.bandwidth != val)
+                {
+                    info.bandwidth = val;
+                    emit dataChanged(index, index);
+                }
             }
             break;
         case COL_TAGS:
             {
-                info.tags.clear();
-                QString strValue = value.toString();
-                QStringList strList = strValue.split(",");
-                for(int i=0; i<strList.size(); ++i)
+                // info.tags should be set by dialog
+                if (info.modified)
                 {
-                    QString strTag = strList[i].trimmed();
-                    info.tags.append( &Bookmarks::Get().findOrAddTag(strTag) );
+                    emit dataChanged(index, index);
                 }
-                emit dataChanged(index, index);
-                return true;
+            }
+            break;
+        case COL_INFO:
+            {
+                const auto val = value.toString();
+                if (info.info != val)
+                {
+                    info.info = val;
+                    emit dataChanged(index, index);
+                }
             }
             break;
         }
@@ -166,61 +219,23 @@ bool BookmarksTableModel::setData(const QModelIndex &index, const QVariant &valu
     return false;
 }
 
-Qt::ItemFlags BookmarksTableModel::flags ( const QModelIndex& index ) const
-{
-    Qt::ItemFlags flags = 0;
-
-    switch(index.column())
-    {
-    case COL_FREQUENCY:
-    case COL_NAME:
-    case COL_BANDWIDTH:
-    case COL_MODULATION:
-        flags = Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsEditable;
-        break;
-    case COL_TAGS:
-        flags = Qt::ItemIsEnabled | Qt::ItemIsSelectable;
-        break;
-    }
-    return flags;
-}
-
 void BookmarksTableModel::update()
 {
-    int iRow = 0;
-    m_Bookmarks.clear();
-    for(int iBookmark=0; iBookmark<Bookmarks::Get().size(); iBookmark++)
+    m_bookmarkList.clear();
+    for(int i = 0, count = m_bookmarks->count(); i < count; i++)
     {
-        BookmarkInfo& info = Bookmarks::Get().getBookmark(iBookmark);
+        auto &info = m_bookmarks->getBookmark(i);
 
-        bool bActive = false;
-        for(int iTag=0; iTag<info.tags.size(); ++iTag)
+        for (auto tag : info.tags)
         {
-            TagInfo& tag = *info.tags[iTag];
-            if(tag.active)
+            if(tag->show)
             {
-                bActive = true;
+                info.setTags(info.tags); // just update tags
+                m_bookmarkList.append(&info);
                 break;
             }
-        }
-        if(bActive)
-        {
-            m_mapRowToBookmarksIndex[iRow]=iBookmark;
-            m_Bookmarks.append(&info);
-            ++iRow;
         }
     }
 
     emit layoutChanged();
 }
-
-BookmarkInfo *BookmarksTableModel::getBookmarkAtRow(int row)
-{
-    return m_Bookmarks[row];
-}
-
-int BookmarksTableModel::GetBookmarksIndexForRow(int iRow)
-{
-  return m_mapRowToBookmarksIndex[iRow];
-}
-

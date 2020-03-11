@@ -69,8 +69,8 @@ MainWindow::MainWindow(const QString cfgfile, bool edit_conf, QWidget *parent) :
     dec_afsk1200(0)
 {
     ui->setupUi(this);
+
     BandPlan::create();
-    Bookmarks::create();
 
     /* Initialise default configuration directory */
     QByteArray xdg_dir = qgetenv("XDG_CONFIG_HOME");
@@ -130,8 +130,8 @@ MainWindow::MainWindow(const QString cfgfile, bool edit_conf, QWidget *parent) :
     uiDockInputCtl = new DockInputCtl();
     uiDockFft = new DockFft();
     BandPlan::Get().setConfigDir(m_cfg_dir);
-    Bookmarks::Get().setConfigDir(m_cfg_dir);
     BandPlan::Get().load();
+    Bookmarks::instance().setConfigDir(m_cfg_dir);
     uiDockBookmarks = new DockBookmarks(this);
 
     // setup some toggle view shortcuts
@@ -260,8 +260,9 @@ MainWindow::MainWindow(const QString cfgfile, bool edit_conf, QWidget *parent) :
     connect(uiDockRDS, SIGNAL(rdsDecoderToggled(bool)), this, SLOT(setRdsDecoder(bool)));
 
     // Bookmarks
+    connect(uiDockBookmarks, SIGNAL(bookmarkModified()), this, SLOT(onBookmarkModified()));
     connect(uiDockBookmarks, SIGNAL(newBookmarkActivated(qint64, QString, int)), this, SLOT(onBookmarkActivated(qint64, QString, int)));
-    connect(uiDockBookmarks->actionAddBookmark, SIGNAL(triggered()), this, SLOT(on_actionAddBookmark_triggered()));
+    connect(uiDockBookmarks, SIGNAL(newBookmarkAdd()), this, SLOT(on_actionAddBookmark_triggered()));
 
     // FrequencyHistory
     connect(&freq_history, &FreqHistory::history_first, this, &MainWindow::on_FHFirst);
@@ -2214,6 +2215,15 @@ void MainWindow::setRdsDecoder(bool checked)
     }
 }
 
+void MainWindow::onBookmarkModified()
+{
+    ui->plotter->updateOverlay();
+}
+
+// TODO there is some conflict between bookmark freq and remote control change (jumping/flicker)
+
+// TODO onBookmarkActivated should be not part of MainWindow
+// TODO this should be handled by provided signals/slots (signal new freq/new mod/...)
 void MainWindow::onBookmarkActivated(qint64 freq, QString demod, int bandwidth)
 {
     setNewFrequency(freq);
@@ -2433,82 +2443,60 @@ void MainWindow::on_actionAboutQt_triggered()
     QMessageBox::aboutQt(this, tr("About Qt"));
 }
 
+// TODO this should be no part of MainWindow
 void MainWindow::on_actionAddBookmark_triggered()
 {
-    bool ok=false;
-    QString name;
-    QString tags; // list of tags separated by comma
-
     // Create and show the Dialog for a new Bookmark.
-    // Write the result into variabe 'name'.
+    QDialog dialog(this);
+    dialog.setWindowTitle("New bookmark");
+
+    QGroupBox *labelAndTextfieldName = new QGroupBox(&dialog);
+    QHBoxLayout *layout = new QHBoxLayout(labelAndTextfieldName);
+    QLabel *label1 = new QLabel("Bookmark name:", labelAndTextfieldName);
+    QLineEdit *textfield = new QLineEdit(labelAndTextfieldName);
+    layout->addWidget(label1);
+    layout->addWidget(textfield);
+    labelAndTextfieldName->setLayout(layout);
+
+    QPushButton *buttonCreateTag = new QPushButton("Create new Tag", &dialog);
+
+    BookmarksTagList *taglist = new BookmarksTagList(&dialog, false, BookmarksTagList::Variant::Selection);
+    taglist->updateTags();
+    taglist->deselectAll();
+
+    auto &bookmarks = Bookmarks::instance();
+    connect(&bookmarks, SIGNAL(tagListChanged()), taglist, SLOT(updateTags()));
+
+    QDialogButtonBox *buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
+    connect(buttonBox, SIGNAL(accepted()), &dialog, SLOT(accept()));
+    connect(buttonBox, SIGNAL(rejected()), &dialog, SLOT(reject()));
+    connect(buttonCreateTag, SIGNAL(clicked()), taglist, SLOT(addNewTag()));
+
+    QVBoxLayout *mainLayout = new QVBoxLayout(&dialog);
+    mainLayout->addWidget(labelAndTextfieldName);
+    mainLayout->addWidget(buttonCreateTag);
+    mainLayout->addWidget(taglist);
+    mainLayout->addWidget(buttonBox);
+
+    if (dialog.exec())
     {
-        QDialog dialog(this);
-        dialog.setWindowTitle("New bookmark");
-
-        QGroupBox* LabelAndTextfieldName = new QGroupBox(&dialog);
-        QLabel* label1 = new QLabel("Bookmark name:", LabelAndTextfieldName);
-        QLineEdit* textfield = new QLineEdit(LabelAndTextfieldName);
-        QHBoxLayout *layout = new QHBoxLayout;
-        layout->addWidget(label1);
-        layout->addWidget(textfield);
-        LabelAndTextfieldName->setLayout(layout);
-
-        QPushButton* buttonCreateTag = new QPushButton("Create new Tag", &dialog);
-
-        BookmarksTagList* taglist = new BookmarksTagList(&dialog, false);
-        taglist->updateTags();
-        taglist->DeselectAll();
-
-        QDialogButtonBox* buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok
-                                              | QDialogButtonBox::Cancel);
-        connect(buttonBox, SIGNAL(accepted()), &dialog, SLOT(accept()));
-        connect(buttonBox, SIGNAL(rejected()), &dialog, SLOT(reject()));
-        connect(buttonCreateTag, SIGNAL(clicked()), taglist, SLOT(AddNewTag()));
-
-        QVBoxLayout *mainLayout = new QVBoxLayout(&dialog);
-        mainLayout->addWidget(LabelAndTextfieldName);
-        mainLayout->addWidget(buttonCreateTag);
-        mainLayout->addWidget(taglist);
-        mainLayout->addWidget(buttonBox);
-
-        ok = dialog.exec();
-        if (ok)
-        {
-            name = textfield->text();
-            tags = taglist->getSelectedTagsAsString();
-            qDebug() << "Tags: " << tags;
-        }
-        else
-        {
-            name.clear();
-            tags.clear();
-        }
-    }
-
-    // Add new Bookmark to Bookmarks.
-    if(ok)
-    {
-        int i;
-
+        // Add new Bookmark to Bookmarks.
         BookmarkInfo info;
         info.frequency = ui->freqCtrl->getFrequency();
         info.bandwidth = ui->plotter->getFilterBw();
         info.modulation = uiDockRxOpt->currentDemodAsString();
-        info.name=name;
-        QStringList listTags = tags.split(",",QString::SkipEmptyParts);
-        info.tags.clear();
-        if (listTags.size() == 0)
-            info.tags.append(&Bookmarks::Get().findOrAddTag(""));
+        info.name = textfield->text().trimmed();
 
+        info.setTags(taglist->getCheckedTags()); // modified for save is detected with tags in getCheckedTags
+        qDebug() << "Tags: " << info.tagsStr;
 
-        for (i = 0; i < listTags.size(); ++i)
-            info.tags.append(&Bookmarks::Get().findOrAddTag(listTags[i]));
-
-        Bookmarks::Get().add(info);
-        uiDockBookmarks->updateTags();
-        uiDockBookmarks->updateBookmarks();
+        info.addTagInfo(&bookmarks.findOrAddTag(TagInfo::UNTAGGED));
+        bookmarks.add(info);
+        emit bookmarks.tagListChanged();
+        emit bookmarks.bookmarksChanged();
         ui->plotter->updateOverlay();
     }
+
 }
 
 /**

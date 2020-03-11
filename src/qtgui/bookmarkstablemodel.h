@@ -4,6 +4,7 @@
  *           http://gqrx.dk/
  *
  * Copyright 2013 Christian Lindner DL2VCL, Stefano Leucci.
+ * Copyright 2020 Markus Kolb
  *
  * Gqrx is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -24,10 +25,8 @@
 #define BOOKMARKSTABLEMODEL_H
 
 #include <QAbstractTableModel>
-#include <QList>
 
 #include "bookmarks.h"
-
 
 class BookmarksTableModel : public QAbstractTableModel
 {
@@ -40,28 +39,26 @@ public:
         COL_NAME,
         COL_MODULATION,
         COL_BANDWIDTH,
-        COL_TAGS
+        COL_TAGS,
+        COL_INFO
     };
 
     explicit BookmarksTableModel(QObject *parent = 0);
     
-    int rowCount ( const QModelIndex & parent = QModelIndex() ) const;
-    int columnCount ( const QModelIndex & parent = QModelIndex() ) const;
-    QVariant headerData ( int section, Qt::Orientation orientation, int role = Qt::DisplayRole ) const;
-    QVariant data ( const QModelIndex & index, int role = Qt::DisplayRole ) const;
-    bool setData ( const QModelIndex & index, const QVariant & value, int role = Qt::EditRole );
-    Qt::ItemFlags flags ( const QModelIndex & index ) const;
+    int columnCount(const QModelIndex &parent = QModelIndex()) const;
+    QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const;
+    Qt::ItemFlags flags(const QModelIndex &index) const;
+    const BookmarkInfo *getBookmark(int index) const;
+    QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const;
+    int rowCount(const QModelIndex &parent = QModelIndex()) const;
+    bool setData(const QModelIndex &index, const QVariant &value, int role = Qt::EditRole);
 
-    BookmarkInfo* getBookmarkAtRow(int row);
-    int GetBookmarksIndexForRow(int iRow);
-
-private:
-    QList<BookmarkInfo*> m_Bookmarks;
-    QMap<int,int> m_mapRowToBookmarksIndex;
-
-signals:
 public slots:
     void update();
+
+private:
+    QList<BookmarkInfo *> m_bookmarkList;
+    Bookmarks            *m_bookmarks;
 
 };
 

@@ -210,6 +210,7 @@ private slots:
     void setRdsDecoder(bool checked);
 
     /* Bookmarks */
+    void onBookmarkModified();
     void onBookmarkActivated(qint64 freq, QString demod, int bandwidth);
 
     /* menu and toolbar actions */

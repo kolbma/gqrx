@@ -4,6 +4,7 @@
  *           http://gqrx.dk/
  *
  * Copyright 2014 Stefano Leucci, Christian Lindner DL2VCL.
+ * Copyright 2020 Markus Kolb
  *
  * Gqrx is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -24,37 +25,60 @@
 #define BOOKMARKSTAGLIST_H
 
 #include <QTableWidget>
+
 #include "bookmarks.h"
 
-/// A QWidget containing the List of Bookmark-Tags.
+/**
+ * @brief A QWidget containing the List of Bookmark-Tags
+ */
 class BookmarksTagList : public QTableWidget
 {
     Q_OBJECT
+
 public:
-    explicit BookmarksTagList(QWidget *parent = 0, bool bShowUntagged = true);
-    QString getSelectedTagsAsString();
-    void setSelectedTagsAsString(const QString& strTags);
-    void setSelectedTags(QList<TagInfo*> tags);
-    bool m_bUpdating;
+    enum Variant
+    {
+        Filter,
+        Selection
+    };
 
-private:
-    bool m_bShowUntagged;
+    explicit BookmarksTagList(QWidget *parent = 0, bool bShowUntagged = true, Variant variant = Variant::Filter);
 
-signals:
+    /**
+     * @brief get checked tags of filter or selection
+     * @return
+     */
+    QList<TagInfo *> getCheckedTags();
+
+    /**
+     * @brief set checked/unchecked based on active state
+     * @param tags
+     */
+    void setTagsCheckState(const QList<TagInfo*> &tags);
 
 public slots:
-    void updateTags();
+    void addTag(const QUuid &id, const QString &name, Qt::CheckState checkstate = Qt::Checked,
+                const QColor &color = TagInfo::DEFAULT_COLOR);
+    void addNewTag();
+    void changeColor(int row);
+    void deleteSelectedTag();
+    void deselectAll();
+    void filterTags();
     void on_cellClicked(int row, int column);
-    void changeColor(int row, int column);
+    void on_itemChanged(QTableWidgetItem *item);
+    void renameSelectedTag();
+    void selectAll();
+    void showContextMenu(const QPoint &pos);
     void toggleCheckedState(int row, int column);
-    void ShowContextMenu(const QPoint& pos);
-    //bool RenameSelectedTag();
-    void AddNewTag();
-    void AddTag(QString name, Qt::CheckState checkstate = Qt::Checked, QColor color = TagInfo::DefaultColor);
-    void DeleteSelectedTag();
-    void DeleteTag(const QString& name);
-    void SelectAll();
-    void DeselectAll();
+    void updateTags();
+
+private:
+    bool       m_blockSlot;
+    Bookmarks *m_bookmarks;
+    bool       m_bShowUntagged;
+    Variant    m_variant;
+
+    inline TagInfo &getTagInfo(const QTableWidgetItem *pItem);
 };
 
 #endif // BOOKMARKSTAGLIST_H
