@@ -51,8 +51,12 @@ public:
     /*! \brief Move the filter to freq_hz from center. */
     void setFilterOffset(qint64 freq_hz)
     {
-        m_DemodCenterFreq = m_CenterFreq + freq_hz;
-        drawOverlay();
+        const auto newFreq = m_CenterFreq + freq_hz;
+        if (m_DemodCenterFreq != newFreq)
+        {
+            m_DemodCenterFreq = m_CenterFreq + freq_hz;
+            drawOverlay();
+        }
     }
     qint64 getFilterOffset(void)
     {
@@ -66,9 +70,19 @@ public:
 
     void setHiLowCutFrequencies(int LowCut, int HiCut)
     {
-        m_DemodLowCutFreq = LowCut;
-        m_DemodHiCutFreq = HiCut;
-        drawOverlay();
+        bool dodraw = false;
+        if (m_DemodLowCutFreq != LowCut)
+        {
+            m_DemodLowCutFreq = LowCut;
+            dodraw = true;
+        }
+        if (m_DemodHiCutFreq != HiCut)
+        {
+            m_DemodHiCutFreq = HiCut;
+            dodraw = true;
+        }
+        if (dodraw)
+            drawOverlay();
     }
 
     void getHiLowCutFrequencies(int *LowCut, int *HiCut)
@@ -85,8 +99,8 @@ public:
         if (s > 0 && s < INT_MAX) {
             m_Span = (qint32)s;
             setFftCenterFreq(m_FftCenter);
+            drawOverlay();
         }
-        drawOverlay();
     }
 
     void setHdivDelta(int delta) { m_HdivDelta = delta; }
@@ -97,7 +111,7 @@ public:
     /* Determines full bandwidth. */
     void setSampleRate(float rate)
     {
-        if (rate > 0.0)
+        if (rate > 0.0 && m_SampleFreq != rate)
         {
             m_SampleFreq = rate;
             drawOverlay();
