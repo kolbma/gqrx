@@ -79,7 +79,6 @@ private:
     Variant    m_variant;
 
     inline TagInfo &getTagInfo(const QTableWidgetItem *pItem);
-
 };
 
 #endif // BOOKMARKSTAGLIST_H

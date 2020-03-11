@@ -74,14 +74,15 @@ private:
     Ui::DockBookmarks          *ui;
 
     bool eventFilter(QObject* object, QEvent* event);
-    void showTagsSelector(int row, int /*column*/);
+    void showTagsSelector(const QUuid &id);
 
 private slots:
     void activated(const QModelIndex &index);
     void addBookmark();
     bool deleteSelectedBookmark();
-    bool editSelectedField();
     void onDataChanged(const QModelIndex &topLeft, const QModelIndex &bottomRight);
+    void onLayoutChanged();
+    void resetSorting();
     void showContextMenu(const QPoint &pos);
-    void tagsClicked(const QModelIndex &index);
+    void tagsDblClicked(const QModelIndex &index);
 };

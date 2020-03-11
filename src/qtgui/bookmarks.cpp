@@ -137,12 +137,12 @@ QList<TagInfo *> BookmarkInfo::getFilteredTags() const
 QList<TagInfo *> BookmarkInfo::getFilteredTags(const QList<TagInfo *> &tagList) const
 {
     QList<TagInfo *> list;
-    for (auto it = tagList.cbegin(), itend = tagList.cend(); it != itend; it++)
+    for (auto tag : tagList)
     {
-        if ((*it)->name == TagInfo::UNTAGGED)
+        if (tag->name == TagInfo::UNTAGGED)
             continue;
 
-        list.append(*it);
+        list.append(tag);
     }
     return list;
 }
@@ -187,10 +187,10 @@ bool BookmarkInfo::operator!=(const BookmarkInfo &other) const
 
 const QColor &BookmarkInfo::getColor() const
 {
-    for(int i = 0; i < tags.size(); ++i)
+    for(auto tag : tags)
     {
-        if(tags[i]->show)
-            return tags[i]->color;
+        if(tag->show)
+            return tag->color;
     }
     return TagInfo::DEFAULT_COLOR;
 }
@@ -208,13 +208,20 @@ Bookmarks &Bookmarks::instance()
     return singleton;
 }
 
-// TODO don't do this sort
-void Bookmarks::add(BookmarkInfo &info)
+void Bookmarks::add(BookmarkInfo &info, bool markModified)
 {
     m_bookmarkList.append(info);
-    std::stable_sort(m_bookmarkList.begin(), m_bookmarkList.end());
-    emit bookmarksChanged();
-    m_bmModified = true;
+    auto &last = m_bookmarkList.last();
+    if (last.id != info.id)
+    {
+        last = m_bookmarkList[m_bookmarkList.indexOf(info)];
+    }
+    m_bookmarkIdMap.insert(info.id, &last);
+    if (markModified)
+    {
+        emit bookmarksChanged();
+        m_bmModified = true;
+    }
 }
 
 bool Bookmarks::addTagInfo(const TagInfo &tagInfo)
@@ -255,6 +262,11 @@ TagInfo &Bookmarks::findOrAddTag(const QString &tagName, bool markModified)
         return m_tagList[idx];
     }
     Q_ASSERT(false);
+}
+
+BookmarkInfo &Bookmarks::getBookmark(const QUuid &id)
+{
+    return *m_bookmarkIdMap[id];
 }
 
 QList<const BookmarkInfo *> Bookmarks::getBookmarksInRange(qint64 low, qint64 high) const
@@ -338,7 +350,6 @@ bool Bookmarks::load()
             }
 #endif
         }
-        // std::sort(m_tagList.begin(), m_tagList.end()); // TODO remove
 
         // Read Bookmarks, after first empty line.
         while (!stream.atEnd())
@@ -376,7 +387,7 @@ bool Bookmarks::load()
                 if (listcount == 6)
                     info.info = list[5];
 
-                m_bookmarkList.append(info);
+                add(info, false);
             }
 #ifndef QT_NO_DEBUG_OUTPUT
             else
@@ -386,7 +397,6 @@ bool Bookmarks::load()
 #endif
         }
         file.close();
-        //std::stable_sort(m_bookmarkList.begin(), m_bookmarkList.end()); // TODO remove
 
 #ifndef QT_NO_DEBUG_OUTPUT
         for (int i = 0; i < m_tagList.count(); i++)
@@ -410,9 +420,10 @@ bool Bookmarks::load()
     return false;
 }
 
-void Bookmarks::remove(int index)
+void Bookmarks::remove(const QUuid &id)
 {
-    m_bookmarkList.removeAt(index);
+    m_bookmarkList.removeOne(*m_bookmarkIdMap.find(id));
+    m_bookmarkIdMap.remove(id);
     m_bmModified = true;
     emit bookmarksChanged();
 }
@@ -538,7 +549,6 @@ bool Bookmarks::save()
         stream << QString("# Tag name").leftJustified(FIELD_WIDTH_TAG) << CSV_SEPARATOR2 <<
                   QString(" color") << endl;
 
-        // TODO why don't delete tags only on request?
         bool usedInfoField = false;
 
         const int bookmarkSize = m_bookmarkList.size();

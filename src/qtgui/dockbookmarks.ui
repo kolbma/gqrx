@@ -54,6 +54,12 @@
        <property name="alternatingRowColors">
         <bool>true</bool>
        </property>
+       <property name="selectionMode">
+        <enum>QAbstractItemView::SingleSelection</enum>
+       </property>
+       <property name="selectionBehavior">
+        <enum>QAbstractItemView::SelectRows</enum>
+       </property>
        <property name="sortingEnabled">
         <bool>true</bool>
        </property>
@@ -62,6 +68,9 @@
        </attribute>
        <attribute name="horizontalHeaderStretchLastSection">
         <bool>true</bool>
+       </attribute>
+       <attribute name="verticalHeaderVisible">
+        <bool>false</bool>
        </attribute>
       </widget>
       <widget class="BookmarksTagList" name="tableWidgetTagList">
@@ -90,7 +99,7 @@
         </size>
        </property>
        <property name="editTriggers">
-        <set>QAbstractItemView::EditKeyPressed</set>
+        <set>QAbstractItemView::AnyKeyPressed|QAbstractItemView::EditKeyPressed</set>
        </property>
        <property name="alternatingRowColors">
         <bool>true</bool>

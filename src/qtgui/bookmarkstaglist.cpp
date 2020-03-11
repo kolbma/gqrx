@@ -57,8 +57,8 @@ BookmarksTagList::BookmarksTagList(QWidget *parent, bool bShowUntagged, Variant 
 
     setSelectionMode(QAbstractItemView::SingleSelection);
     setSelectionBehavior(QAbstractItemView::SelectRows);
-    //setSortingEnabled(true);
-    // TODO remove commented
+
+    sortItems(1);
 }
 
 QList<TagInfo *> BookmarksTagList::getCheckedTags()
@@ -104,20 +104,20 @@ void BookmarksTagList::setTagsCheckState(const QList<TagInfo*> &tags)
         bool checked = false;
         QTableWidgetItem *pItem = item(i, 1);
         const QUuid id = pItem->data(Bookmarks::ID_ROLE).value<QUuid>();
-        for(auto it = tags.begin(), itend = tags.end(); it != itend; ++it)
+        for (auto tag : tags)
         {
-            if ((*it)->id == id)
+            if (tag->id == id)
             {
                 if (m_variant == Variant::Filter)
                 {
-                    checked = (*it)->show;
+                    checked = tag->show;
                     break;
                 }
                 else if (m_variant == Variant::Selection)
                 {
                     // we get here only the BookmarkInfo tags and can set to true
                     checked = true;
-                    (*it)->checked = true;
+                    tag->checked = true;
                     break;
                 }
                 Q_ASSERT(false);
@@ -125,7 +125,6 @@ void BookmarksTagList::setTagsCheckState(const QList<TagInfo*> &tags)
         }
         pItem->setCheckState(checked ? Qt::Checked : Qt::Unchecked);
     }
-    setSortingEnabled(true); // TODO sorting
 }
 
 void BookmarksTagList::addTag(const QUuid &id, const QString &name, Qt::CheckState checkstate, const QColor &color)
@@ -133,8 +132,10 @@ void BookmarksTagList::addTag(const QUuid &id, const QString &name, Qt::CheckSta
     int i = rowCount();
     setRowCount(i + 1);
 
+    setSortingEnabled(false);
+
     // Column 1
-    QTableWidgetItem *item = new QTableWidgetItem(name);
+    auto *item = new QTableWidgetItem(name);
     item->setData(Bookmarks::ID_ROLE, id);
     item->setCheckState(checkstate);
     item->setFlags(Qt::ItemIsSelectable | Qt::ItemIsEditable | Qt::ItemIsEnabled);
@@ -146,6 +147,8 @@ void BookmarksTagList::addTag(const QUuid &id, const QString &name, Qt::CheckSta
     item->setFlags(Qt::ItemIsEnabled);
     item->setBackgroundColor(color);
     setItem(i, 0, item);
+
+    setSortingEnabled(true);
 }
 
 void BookmarksTagList::addNewTag()
@@ -279,39 +282,39 @@ void BookmarksTagList::selectAll()
 
 void BookmarksTagList::showContextMenu(const QPoint &pos)
 {
-    QMenu *menu = new QMenu(this);
+    auto *menu = new QMenu(this);
 
     // MenuItem "Rename"
     {
-        QAction *action = new QAction("Rename", this);
+        auto *action = new QAction("Rename", this);
         menu->addAction(action);
         connect(action, SIGNAL(triggered()), this, SLOT(renameSelectedTag()));
     }
 
     // MenuItem "Create new Tag"
     {
-        QAction *action = new QAction("Create new Tag", this);
+        auto *action = new QAction("Create new Tag", this);
         menu->addAction(action);
         connect(action, SIGNAL(triggered()), this, SLOT(addNewTag()));
     }
 
     // Menu "Delete Tag"
     {
-        QAction *action = new QAction("Delete Tag", this);
+        auto *action = new QAction("Delete Tag", this);
         menu->addAction(action);
         connect(action, SIGNAL(triggered()), this, SLOT(deleteSelectedTag()));
     }
 
     // Menu "Select All"
     {
-        QAction *action = new QAction("Select All", this);
+        auto *action = new QAction("Select All", this);
         menu->addAction(action);
         connect(action, SIGNAL(triggered()), this, SLOT(selectAll()));
     }
 
     // Menu "Deselect All"
     {
-        QAction *action = new QAction("Deselect All", this);
+        auto *action = new QAction("Deselect All", this);
         menu->addAction(action);
         connect(action, SIGNAL(triggered()), this, SLOT(deselectAll()));
     }
@@ -333,7 +336,6 @@ void BookmarksTagList::toggleCheckedState(int row, int column)
     }
 }
 
-// TODO sorting
 void BookmarksTagList::updateTags()
 {
     m_blockSlot = true;
@@ -343,30 +345,24 @@ void BookmarksTagList::updateTags()
 
     // Rebuild List in GUI
     clearContents();
-    setSortingEnabled(false);
     setRowCount(0);
 
-    for (auto it = tagList.cbegin(), it_end = tagList.cend(); it != it_end; it++)
+    for (const auto &tag : tagList)
     {
-        if (it->name != TagInfo::UNTAGGED || m_bShowUntagged)
+        if (tag.name != TagInfo::UNTAGGED || m_bShowUntagged)
         {
             bool checked = false;
             if (m_variant == Variant::Filter)
             {
-                checked = it->show;
+                checked = tag.show;
             }
             else if (m_variant == Variant::Selection)
             {
-                checked = it->checked;
+                checked = tag.checked;
             }
-            addTag(it->id,
-                   it->name,
-                   checked ? Qt::Checked : Qt::Unchecked,
-                   it->color);
+            addTag(tag.id, tag.name, checked ? Qt::Checked : Qt::Unchecked, tag.color);
         }
     }
-
-    setSortingEnabled(true);
 
     m_blockSlot = false;
 }

@@ -203,8 +203,9 @@ public:
     /**
      * @brief add bookmark (optional adding UNTAGGED)
      * @param info
+     * @param markModified
      */
-    void add(BookmarkInfo &info);
+    void add(BookmarkInfo &info, bool markModified = true);
 
     /**
      * @brief add TagInfo
@@ -228,6 +229,14 @@ public:
     TagInfo &findOrAddTag(const QString &tagName, bool markModified = true);
 
     BookmarkInfo &getBookmark(int i) { return m_bookmarkList[i]; }
+
+    /**
+     * @brief getBookmark by QUuid id, is backed by QMap<QUuid, *BookmarkInfo>
+     * @param id
+     * @return
+     */
+    BookmarkInfo &getBookmark(const QUuid &id);
+
     QList<const BookmarkInfo *> getBookmarksInRange(qint64 low, qint64 high) const;
 
     const QList<TagInfo> &getTagList() const { return m_tagList; }
@@ -254,7 +263,11 @@ public:
      */
     bool load();
 
-    void remove(int index);
+    /**
+     * @brief remove Bookmark by QUuid
+     * @param id
+     */
+    void remove(const QUuid &id);
 
     /**
      * @brief remove TagInfo by QUuid
@@ -326,6 +339,7 @@ signals:
 
 private:
     bool                 m_bmModified;
+    QMap<QUuid, BookmarkInfo *> m_bookmarkIdMap;
     QList<BookmarkInfo>  m_bookmarkList;
     QString              m_bookmarksFile;
     QTimer               *m_saveTimer;

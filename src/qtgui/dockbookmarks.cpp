@@ -26,6 +26,7 @@
 #include <QDialogButtonBox>
 #include <QMenu>
 #include <QMessageBox>
+#include <QSortFilterProxyModel>
 
 #include "bookmarkstaglist.h"
 #include "dockbookmarks.h"
@@ -45,7 +46,7 @@ ComboBoxDelegateModulation::ComboBoxDelegateModulation(QObject *parent)
 QWidget *ComboBoxDelegateModulation::createEditor(QWidget *parent, const QStyleOptionViewItem &/* option */,
                                                   const QModelIndex &index) const
 {
-    QComboBox* comboBox = new QComboBox(parent); // handled by Qt with deleteLater
+    auto comboBox = new QComboBox(parent); // handled by Qt with deleteLater
     for (int i = 0; i < DockRxOpt::ModulationStrings.size(); ++i)
     {
         comboBox->addItem(DockRxOpt::ModulationStrings[i]);
@@ -56,7 +57,7 @@ QWidget *ComboBoxDelegateModulation::createEditor(QWidget *parent, const QStyleO
 
 void ComboBoxDelegateModulation::setEditorData(QWidget *editor, const QModelIndex &index) const
 {
-    QComboBox *comboBox = static_cast<QComboBox*>(editor);
+    auto comboBox = static_cast<QComboBox*>(editor);
     QString value = index.model()->data(index, Qt::EditRole).toString();
     int iModulation = DockRxOpt::GetEnumForModulationString(value);
     comboBox->setCurrentIndex(iModulation);
@@ -65,7 +66,7 @@ void ComboBoxDelegateModulation::setEditorData(QWidget *editor, const QModelInde
 void ComboBoxDelegateModulation::setModelData(QWidget *editor, QAbstractItemModel *model,
                                               const QModelIndex &index) const
 {
-    const QComboBox *comboBox = static_cast<QComboBox*>(editor);
+    const auto comboBox = static_cast<QComboBox*>(editor);
     model->setData(index, comboBox->currentText(), Qt::EditRole);
 }
 
@@ -80,14 +81,15 @@ DockBookmarks::DockBookmarks(QWidget *parent) :
 {
     ui->setupUi(this);
 
-    bookmarksTableModel = new BookmarksTableModel();
+    bookmarksTableModel = new BookmarksTableModel(this);
+    auto *bookmarksSortModel = new QSortFilterProxyModel(this);
+    bookmarksSortModel->setSortCaseSensitivity(Qt::CaseSensitivity::CaseInsensitive);
+    bookmarksSortModel->setSourceModel(bookmarksTableModel);
 
     // Frequency List
-    ui->tableViewFrequencyList->setModel(bookmarksTableModel);
+    ui->tableViewFrequencyList->setModel(bookmarksSortModel);
     ui->tableViewFrequencyList->setColumnWidth(BookmarksTableModel::COL_NAME,
         ui->tableViewFrequencyList->columnWidth(BookmarksTableModel::COL_NAME) * 2);
-    ui->tableViewFrequencyList->setSelectionBehavior(QAbstractItemView::SelectRows);
-    ui->tableViewFrequencyList->setSelectionMode(QAbstractItemView::SingleSelection);
     ui->tableViewFrequencyList->installEventFilter(this);
 
     // Demod Selection in Frequency List Table.
@@ -96,21 +98,21 @@ DockBookmarks::DockBookmarks(QWidget *parent) :
 
     // Bookmarks Context menu
     contextmenu = new QMenu(this);
-    // MenuItem Edit
+    // MenuItem Reset sorting
     {
-        QAction* action = new QAction("Edit Field", this);
+        auto action = new QAction("Reset sorting", this);
         contextmenu->addAction(action);
-        connect(action, SIGNAL(triggered()), this, SLOT(editSelectedField()));
+        connect(action, SIGNAL(triggered()), this, SLOT(resetSorting()));
     }
     // MenuItem Delete
     {
-        QAction* action = new QAction("Delete Bookmark", this);
+        auto action = new QAction("Delete Bookmark", this);
         contextmenu->addAction(action);
         connect(action, SIGNAL(triggered()), this, SLOT(deleteSelectedBookmark()));
     }
     // MenuItem Add
     {
-        QAction* action = new QAction("Add Bookmark", this);
+        auto action = new QAction("Add Bookmark", this);
         contextmenu->addAction(action);
         connect(action, SIGNAL(triggered()), this, SLOT(addBookmark()));
     }
@@ -118,9 +120,10 @@ DockBookmarks::DockBookmarks(QWidget *parent) :
     connect(ui->tableViewFrequencyList, SIGNAL(customContextMenuRequested(const QPoint&)),
         this, SLOT(showContextMenu(const QPoint&)));
 
-    // Update GUI // TODO do this on first show
+    // Update GUI (tags in FFT)
     m_bookmarks->load();
     bookmarksTableModel->update();
+    resetSorting();
 
     m_currentFrequency = 0;
 
@@ -130,9 +133,11 @@ DockBookmarks::DockBookmarks(QWidget *parent) :
     connect(ui->tableViewFrequencyList, SIGNAL(activated(const QModelIndex &)),
             this, SLOT(activated(const QModelIndex &)));
     connect(ui->tableViewFrequencyList, SIGNAL(doubleClicked(const QModelIndex &)),
-            this, SLOT(tagsClicked(const QModelIndex &)));
+            this, SLOT(tagsDblClicked(const QModelIndex &)));
     connect(bookmarksTableModel, SIGNAL(dataChanged(const QModelIndex &, const QModelIndex &)),
             this, SLOT(onDataChanged(const QModelIndex &, const QModelIndex &)));
+    connect(bookmarksTableModel, SIGNAL(layoutChanged()), this, SLOT(onLayoutChanged()));
+    connect(bookmarksSortModel, SIGNAL(layoutChanged()), this, SLOT(onLayoutChanged()));
     connect(m_bookmarks, SIGNAL(tagListChanged()), ui->tableWidgetTagList, SLOT(updateTags()));
     connect(m_bookmarks, SIGNAL(tagListFilter()), ui->tableWidgetTagList, SLOT(filterTags()));
     connect(m_bookmarks, SIGNAL(bookmarksChanged()), bookmarksTableModel, SLOT(update()));
@@ -148,16 +153,25 @@ DockBookmarks::~DockBookmarks()
 void DockBookmarks::setNewFrequency(qint64 rx_freq)
 {
     ui->tableViewFrequencyList->clearSelection();
-    const int iRowCount = bookmarksTableModel->rowCount();
-    for (int row = 0; row < iRowCount; ++row)
+    const int rowcount = bookmarksTableModel->rowCount();
+    for (int i = 0; i < rowcount; ++i)
     {
-        BookmarkInfo& info = *(bookmarksTableModel->getBookmarkAtRow(row));
+        const auto &info = *bookmarksTableModel->getBookmark(i);
         if (std::abs(rx_freq - info.frequency) <= ((info.bandwidth / 2 ) + 1))
         {
-            ui->tableViewFrequencyList->selectRow(row);
-            ui->tableViewFrequencyList->scrollTo(ui->tableViewFrequencyList->currentIndex(),
-                                                 QAbstractItemView::EnsureVisible);
-            break;
+            const auto model = ui->tableViewFrequencyList->model();
+            for (int row = 0; row < rowcount; ++row)
+            {
+                const auto index = model->index(row, 1);
+                const auto id = index.data(Bookmarks::ID_ROLE).value<QUuid>();
+                if (id == info.id)
+                {
+                    ui->tableViewFrequencyList->selectRow(row);
+                    ui->tableViewFrequencyList->scrollTo(ui->tableViewFrequencyList->currentIndex(),
+                                                         QAbstractItemView::EnsureVisible);
+                    break;
+                }
+            }
         }
     }
     m_currentFrequency = rx_freq;
@@ -167,7 +181,7 @@ bool DockBookmarks::eventFilter(QObject* object, QEvent* event)
 {
     if (event->type() == QEvent::KeyPress)
     {
-        QKeyEvent* pKeyEvent = static_cast<QKeyEvent *>(event);
+        auto pKeyEvent = static_cast<QKeyEvent *>(event);
         if (pKeyEvent->key() == Qt::Key_Delete && ui->tableViewFrequencyList->hasFocus())
         {
             return deleteSelectedBookmark();
@@ -176,26 +190,25 @@ bool DockBookmarks::eventFilter(QObject* object, QEvent* event)
     return QWidget::eventFilter(object, event);
 }
 
-void DockBookmarks::showTagsSelector(int row, int /*column*/)
+void DockBookmarks::showTagsSelector(const QUuid &id)
 {
-    const int idx = bookmarksTableModel->getBookmarksIndexForRow(row);
-    BookmarkInfo& info = m_bookmarks->getBookmark(idx);
+    auto &info = m_bookmarks->getBookmark(id);
 
     // Create and show the Dialog for a new Bookmark.
     QDialog dialog(this);
     dialog.setWindowTitle("Change Bookmark Tags");
 
-    BookmarksTagList *taglist = new BookmarksTagList(&dialog, false, BookmarksTagList::Variant::Selection);
+    auto taglist = new BookmarksTagList(&dialog, false, BookmarksTagList::Variant::Selection);
     taglist->updateTags();
     taglist->setTagsCheckState(info.tags);
     connect(m_bookmarks, SIGNAL(tagListChanged()), taglist, SLOT(updateTags()));
 
-    QDialogButtonBox* buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok
+    auto buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok
                                           | QDialogButtonBox::Cancel);
     connect(buttonBox, SIGNAL(accepted()), &dialog, SLOT(accept()));
     connect(buttonBox, SIGNAL(rejected()), &dialog, SLOT(reject()));
 
-    QVBoxLayout *mainLayout = new QVBoxLayout(&dialog);
+    auto mainLayout = new QVBoxLayout(&dialog);
     mainLayout->addWidget(taglist);
     mainLayout->addWidget(buttonBox);
 
@@ -206,10 +219,14 @@ void DockBookmarks::showTagsSelector(int row, int /*column*/)
     }
 }
 
-void DockBookmarks::activated(const QModelIndex & index)
+void DockBookmarks::activated(const QModelIndex &index)
 {
-    const BookmarkInfo *info = bookmarksTableModel->getBookmarkAtRow(index.row());
-    emit newBookmarkActivated(info->frequency, info->modulation, info->bandwidth);
+    if(index.column() != BookmarksTableModel::COL_TAGS)
+    {
+        const auto id = index.data(Bookmarks::ID_ROLE).value<QUuid>();
+        const auto &info = m_bookmarks->getBookmark(id);
+        emit newBookmarkActivated(info.frequency, info.modulation, info.bandwidth);
+    }
 }
 
 void DockBookmarks::addBookmark()
@@ -219,7 +236,7 @@ void DockBookmarks::addBookmark()
 
 bool DockBookmarks::deleteSelectedBookmark()
 {
-    QModelIndexList selected = ui->tableViewFrequencyList->selectionModel()->selectedRows();
+    const QModelIndexList selected = ui->tableViewFrequencyList->selectionModel()->selectedRows();
 
     if (selected.empty())
     {
@@ -229,40 +246,11 @@ bool DockBookmarks::deleteSelectedBookmark()
     if (QMessageBox::question(this, "Delete bookmark", "Really delete?",
                               QMessageBox::Yes | QMessageBox::No) == QMessageBox::Yes)
     {
-        int iIndex = bookmarksTableModel->getBookmarksIndexForRow(selected.first().row());
-        m_bookmarks->remove(iIndex);
+        const auto id = selected.constFirst().data(Bookmarks::ID_ROLE).value<QUuid>();
+        m_bookmarks->remove(id);
         bookmarksTableModel->update();
     }
     return true;
-}
-
-bool DockBookmarks::editSelectedField()
-{
-    QModelIndexList selected = ui->tableViewFrequencyList->selectionModel()->selectedRows();
-
-    if (selected.empty())
-    {
-        return true;
-    }
-
-    auto row = selected.first().row();
-    auto col = selected.first().column();
-    switch (col)
-    {
-    case BookmarksTableModel::COL_BANDWIDTH:
-        break;
-    case BookmarksTableModel::COL_FREQUENCY:
-        break;
-    case BookmarksTableModel::COL_MODULATION:
-        break;
-    case BookmarksTableModel::COL_NAME:
-        // ui->tableViewFrequencyList->edit(...); // TODO
-        break;
-    case BookmarksTableModel::COL_TAGS:
-        break;
-    default:
-        break;
-    }
 }
 
 void DockBookmarks::onDataChanged(const QModelIndex &topLeft, const QModelIndex &bottomRight)
@@ -273,16 +261,28 @@ void DockBookmarks::onDataChanged(const QModelIndex &topLeft, const QModelIndex 
     emit bookmarkModified();
 }
 
-void DockBookmarks::showContextMenu(const QPoint& pos)
+void DockBookmarks::onLayoutChanged()
+{
+    ui->tableViewFrequencyList->scrollTo(ui->tableViewFrequencyList->currentIndex(),
+                                         QAbstractItemView::EnsureVisible);
+}
+
+void DockBookmarks::resetSorting()
+{
+    ui->tableViewFrequencyList->horizontalHeader()->setSortIndicator(-1, Qt::SortOrder::AscendingOrder);
+    ui->tableViewFrequencyList->model()->sort(-1);
+}
+
+void DockBookmarks::showContextMenu(const QPoint &pos)
 {
     contextmenu->popup(ui->tableViewFrequencyList->viewport()->mapToGlobal(pos));
 }
 
-void DockBookmarks::tagsClicked(const QModelIndex & index)
+void DockBookmarks::tagsDblClicked(const QModelIndex &index)
 {
     if(index.column() == BookmarksTableModel::COL_TAGS)
     {
-        showTagsSelector(index.row(), index.column());
+        const auto id = index.data(Bookmarks::ID_ROLE).value<QUuid>();
+        showTagsSelector(id);
     }
 }
-

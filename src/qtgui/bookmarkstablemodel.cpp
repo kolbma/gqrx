@@ -73,16 +73,16 @@ QVariant BookmarksTableModel::headerData(int section, Qt::Orientation orientatio
 
 QVariant BookmarksTableModel::data(const QModelIndex &index, int role) const
 {
-    const BookmarkInfo &info = *m_bookmarkList[index.row()];
-
     if (role == Qt::BackgroundColorRole)
     {
+        const BookmarkInfo &info = *m_bookmarkList[index.row()];
         QColor bg(info.getColor());
         bg.setAlpha(0x60);
         return bg;
     }
     else if(role == Qt::DisplayRole || role == Qt::EditRole)
     {
+        const BookmarkInfo &info = *m_bookmarkList[index.row()];
         switch(index.column())
         {
         case COL_FREQUENCY:
@@ -98,6 +98,11 @@ QVariant BookmarksTableModel::data(const QModelIndex &index, int role) const
         case COL_INFO:
             return info.info;
         }
+    }
+    else if (role == Bookmarks::ID_ROLE)
+    {
+        const BookmarkInfo &info = *m_bookmarkList[index.row()];
+        return info.id;
     }
     return QVariant();
 }
@@ -130,14 +135,9 @@ Qt::ItemFlags BookmarksTableModel::flags(const QModelIndex &index) const
     return flags;
 }
 
-BookmarkInfo *BookmarksTableModel::getBookmarkAtRow(int row)
+const BookmarkInfo *BookmarksTableModel::getBookmark(int index) const
 {
-    return m_bookmarkList[row];
-}
-
-int BookmarksTableModel::getBookmarksIndexForRow(int iRow)
-{
-  return m_mapRowToBookmarksIndex[iRow];
+    return m_bookmarkList[index];
 }
 
 int BookmarksTableModel::rowCount(const QModelIndex& /* parent */) const
@@ -149,7 +149,7 @@ bool BookmarksTableModel::setData(const QModelIndex &index, const QVariant &valu
 {
     if(role == Qt::EditRole)
     {
-        BookmarkInfo &info = *m_bookmarkList[index.row()]; // TODO does this work with sorting?
+        BookmarkInfo &info = *m_bookmarkList[index.row()];
         switch(index.column())
         {
         case COL_FREQUENCY:
@@ -222,19 +222,16 @@ bool BookmarksTableModel::setData(const QModelIndex &index, const QVariant &valu
 void BookmarksTableModel::update()
 {
     m_bookmarkList.clear();
-    for(int iBookmark = 0, count = m_bookmarks->count(), iRow = 0; iBookmark < count; iBookmark++)
+    for(int i = 0, count = m_bookmarks->count(); i < count; i++)
     {
-        BookmarkInfo &info = m_bookmarks->getBookmark(iBookmark);
+        auto &info = m_bookmarks->getBookmark(i);
 
-        const int tagcount = info.tags.count();
-        for(int iTag = 0; iTag < tagcount; ++iTag)
+        for (auto tag : info.tags)
         {
-            if(info.tags[iTag]->show)
+            if(tag->show)
             {
-                m_mapRowToBookmarksIndex[iRow] = iBookmark; // TODO does this work mit sort?
                 info.setTags(info.tags); // just update tags
                 m_bookmarkList.append(&info);
-                ++iRow;
                 break;
             }
         }
