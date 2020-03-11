@@ -2086,7 +2086,9 @@ void MainWindow::onBookmarkModified()
 }
 
 // TODO there is some conflict between bookmark freq and remote control change (jumping/flicker)
-// TODO this should be handled by existing signals/slots
+
+// TODO onBookmarkActivated should be not part of MainWindow
+// TODO this should be handled by provided signals/slots (signal new freq/new mod/...)
 void MainWindow::onBookmarkActivated(qint64 freq, QString demod, int bandwidth)
 {
     setNewFrequency(freq);
