@@ -221,6 +221,8 @@ bool BookmarksTableModel::setData(const QModelIndex &index, const QVariant &valu
 
 void BookmarksTableModel::update()
 {
+    emit layoutAboutToBeChanged();
+
     m_bookmarkList.clear();
     for(int i = 0, count = m_bookmarks->count(); i < count; i++)
     {

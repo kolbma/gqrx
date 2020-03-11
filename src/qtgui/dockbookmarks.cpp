@@ -26,7 +26,6 @@
 #include <QDialogButtonBox>
 #include <QMenu>
 #include <QMessageBox>
-#include <QSortFilterProxyModel>
 
 #include "bookmarkstaglist.h"
 #include "dockbookmarks.h"
@@ -82,7 +81,8 @@ DockBookmarks::DockBookmarks(QWidget *parent) :
     ui->setupUi(this);
 
     bookmarksTableModel = new BookmarksTableModel(this);
-    auto *bookmarksSortModel = new QSortFilterProxyModel(this);
+
+    bookmarksSortModel = new QSortFilterProxyModel(this);
     bookmarksSortModel->setSortCaseSensitivity(Qt::CaseSensitivity::CaseInsensitive);
     bookmarksSortModel->setSourceModel(bookmarksTableModel);
 
@@ -136,7 +136,7 @@ DockBookmarks::DockBookmarks(QWidget *parent) :
             this, SLOT(tagsDblClicked(const QModelIndex &)));
     connect(bookmarksTableModel, SIGNAL(dataChanged(const QModelIndex &, const QModelIndex &)),
             this, SLOT(onDataChanged(const QModelIndex &, const QModelIndex &)));
-    connect(bookmarksTableModel, SIGNAL(layoutChanged()), this, SLOT(onLayoutChanged()));
+    //connect(bookmarksTableModel, SIGNAL(layoutChanged()), this, SLOT(onLayoutChanged()));
     connect(bookmarksSortModel, SIGNAL(layoutChanged()), this, SLOT(onLayoutChanged()));
     connect(m_bookmarks, SIGNAL(tagListChanged()), ui->tableWidgetTagList, SLOT(updateTags()));
     connect(m_bookmarks, SIGNAL(tagListFilter()), ui->tableWidgetTagList, SLOT(filterTags()));
@@ -263,8 +263,9 @@ void DockBookmarks::onDataChanged(const QModelIndex &topLeft, const QModelIndex 
 
 void DockBookmarks::onLayoutChanged()
 {
-    ui->tableViewFrequencyList->scrollTo(ui->tableViewFrequencyList->currentIndex(),
-                                         QAbstractItemView::EnsureVisible);
+    const auto idx = ui->tableViewFrequencyList->currentIndex();
+    if (idx.isValid())
+        ui->tableViewFrequencyList->scrollTo(idx, QAbstractItemView::EnsureVisible);
 }
 
 void DockBookmarks::resetSorting()
