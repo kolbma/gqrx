@@ -85,6 +85,9 @@ int gettimeofday(struct timeval * tp, struct timezone * tzp)
 #define PLOTTER_FILTER_BOX_COLOR    0xFFA0A0A4
 // FIXME: Should cache the QColors also
 
+#define HOR_MARGIN 5
+#define VER_MARGIN 5
+
 static inline bool val_is_out_of_range(float val, float min, float max)
 {
     return (val < min || val > max);
@@ -170,6 +173,7 @@ CPlotter::CPlotter(QWidget *parent) : QFrame(parent)
     m_Percent2DScreen = 35;	//percent of screen used for 2D display
     m_VdivDelta = 30;
     m_HdivDelta = 70;
+    m_BandPlanHeight = 22;
 
     m_FreqDigits = 3;
 
@@ -288,10 +292,20 @@ void CPlotter::mouseMoveEvent(QMouseEvent* event)
                     m_CursorCaptured = NOCAP;
                 }
                 if (m_TooltipsEnabled)
-                    QToolTip::showText(event->globalPos(),
-                                       QString("F: %1 kHz")
-                                       .arg(freqFromX(pt.x())/1.e3f, 0, 'f', 3),
-                                       this);
+                {
+                    qint64 hoverFrequency = freqFromX(pt.x());
+                    QString toolTipText = QString("F: %1 kHz").arg(hoverFrequency/1.e3f, 0, 'f', 3);
+                    QFontMetrics metrics(m_Font);
+                    int bandTopY = m_OverlayPixmap.height() - metrics.height() - 2 * VER_MARGIN - m_BandPlanHeight;
+                    QList<BandInfo> hoverBands = BandPlan::Get().getBandsEncompassing(hoverFrequency);
+                    if(m_BandPlanEnabled && pt.y() > bandTopY && hoverBands.size() > 0)
+                    {
+                        toolTipText.append("\n");
+                        for (int i = 0; i < hoverBands.size(); i++)
+                            toolTipText.append("\n" + hoverBands[i].name);
+                    }
+                    QToolTip::showText(event->globalPos(), toolTipText, this);
+                }
             }
             m_GrabPosition = 0;
         }
@@ -1273,9 +1287,6 @@ void CPlotter::drawOverlay()
     painter.setBrush(Qt::SolidPattern);
     painter.fillRect(0, 0, w, h, QColor(PLOTTER_BGD_COLOR));
 
-#define HOR_MARGIN 5
-#define VER_MARGIN 5
-
     // X and Y axis areas
     m_YAxisWidth = metrics.width("XXXX") + 2 * HOR_MARGIN;
     m_XAxisYCenter = h - metrics.height()/2;
@@ -1346,18 +1357,19 @@ void CPlotter::drawOverlay()
 
         for (int i = 0; i < bands.size(); i++)
         {
-            int min_pos = xFromFreq(bands[i].minFrequency);
-            int max_pos = xFromFreq(bands[i].maxFrequency);
-            int del_pos = max_pos - min_pos;
-            rect.setRect(min_pos, h - 45, del_pos, h);
+            int band_left = xFromFreq(bands[i].minFrequency);
+            int band_right = xFromFreq(bands[i].maxFrequency);
+            int band_width = band_right - band_left;
+            rect.setRect(band_left, xAxisTop - m_BandPlanHeight, band_width, m_BandPlanHeight);
             painter.fillRect(rect, bands[i].color);
-            int textWidth = metrics.width(bands[i].name + " (" + bands[i].modulation + ")");
-            if (min_pos < w && del_pos > textWidth + 20)
+            QString band_label = bands[i].name + " (" + bands[i].modulation + ")";
+            int textWidth = metrics.width(band_label);
+            if (band_left < w && band_width > textWidth + 20)
             {
                 painter.setOpacity(1.0);
-                rect.setRect(min_pos + 10, h - 40, textWidth + 10, metrics.height());
+                rect.setRect(band_left, xAxisTop - m_BandPlanHeight, band_width, metrics.height());
                 painter.setPen(QColor(PLOTTER_TEXT_COLOR));
-                painter.drawText(rect, Qt::AlignHCenter, bands[i].name + " (" + bands[i].modulation + ")");
+                painter.drawText(rect, Qt::AlignCenter, band_label);
             }
         }
     }
