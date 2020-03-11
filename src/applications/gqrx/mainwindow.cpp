@@ -257,6 +257,7 @@ MainWindow::MainWindow(const QString cfgfile, bool edit_conf, QWidget *parent) :
     connect(uiDockBookmarks, SIGNAL(bookmarkModified()), this, SLOT(onBookmarkModified()));
     connect(uiDockBookmarks, SIGNAL(newBookmarkActivated(qint64, QString, int)), this, SLOT(onBookmarkActivated(qint64, QString, int)));
     connect(uiDockBookmarks, SIGNAL(newBookmarkAdd()), this, SLOT(on_actionAddBookmark_triggered()));
+    connect(uiDockBookmarks, SIGNAL(tagListModified()), ui->plotter, SLOT(updateOverlay()));
 
     // I/Q playback
     connect(iq_tool, SIGNAL(startRecording(QString)), this, SLOT(startIqRecording(QString)));
