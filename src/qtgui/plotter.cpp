@@ -205,7 +205,7 @@ void CPlotter::mouseMoveEvent(QMouseEvent* event)
 
     QPoint pt = event->pos();
 
-    /* mouse ent er / mouse leave events */
+    /* mouse enter / mouse leave events */
     if (m_OverlayPixmap.rect().contains(pt))
     {
         //is in Overlay bitmap region
@@ -1292,14 +1292,14 @@ void CPlotter::drawOverlay()
         auto bookmarks = Bookmarks::instance().getBookmarksInRange(m_CenterFreq + m_FftCenter - m_Span / 2,
                                                                    m_CenterFreq + m_FftCenter + m_Span / 2);
         int tagEnd[nLevels] = {0};
-        for (int i = 0; i < bookmarks.count(); i++)
+        for (const auto bookmark : bookmarks)
         {
-            x = xFromFreq(bookmarks[i]->frequency);
+            x = xFromFreq(bookmark->frequency);
 
 #if defined(_WIN16) || defined(_WIN32) || defined(_WIN64)
-            int nameWidth = fm.width(bookmarks[i]->name);
+            int nameWidth = fm.width(bookmark->name);
 #else
-            int nameWidth = fm.boundingRect(bookmarks[i]->name).width();
+            int nameWidth = fm.boundingRect(bookmark->name).width();
 #endif
 
             int level = 0;
@@ -1312,9 +1312,9 @@ void CPlotter::drawOverlay()
             tagEnd[level] = x + nameWidth + slant - 1;
             m_BookmarkTags.append(qMakePair<QRect, qint64>(QRect(x, level * levelHeight,
                                                                  nameWidth + slant, fontHeight),
-                                                           bookmarks[i]->frequency));
+                                                           bookmark->frequency));
 
-            QColor color = QColor(bookmarks[i]->getColor());
+            QColor color = QColor(bookmark->getColor());
             color.setAlpha(0x60);
             // Vertical line
             painter.setPen(QPen(color, 1, Qt::DashLine));
@@ -1333,7 +1333,7 @@ void CPlotter::drawOverlay()
             painter.setPen(QPen(color, 2, Qt::SolidLine));
             painter.drawText(x + slant, level * levelHeight, nameWidth,
                              fontHeight, Qt::AlignVCenter | Qt::AlignHCenter,
-                             bookmarks[i]->name);
+                             bookmark->name);
         }
     }
 
