@@ -25,6 +25,7 @@
 
 #include <QDockWidget>
 #include <QItemDelegate>
+#include <QSortFilterProxyModel>
 #include <QTableWidgetItem>
 
 #include "qtgui/bookmarkstablemodel.h"
@@ -66,6 +67,7 @@ public slots:
     void setNewFrequency(qint64 rx_freq);
 
 private:
+    QSortFilterProxyModel      *bookmarksSortModel;
     BookmarksTableModel        *bookmarksTableModel;
     QMenu                      *contextmenu;
     ComboBoxDelegateModulation *delegateModulation;

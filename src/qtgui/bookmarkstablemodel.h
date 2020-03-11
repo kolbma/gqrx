@@ -57,9 +57,8 @@ public slots:
     void update();
 
 private:
-    QList<BookmarkInfo *> m_bookmarkList;
-    Bookmarks            *m_bookmarks;
-
+    QList<BookmarkInfo *>  m_bookmarkList;
+    Bookmarks             *m_bookmarks;
 };
 
 #endif
