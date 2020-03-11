@@ -140,6 +140,7 @@ DockBookmarks::DockBookmarks(QWidget *parent) :
     connect(bookmarksSortModel, SIGNAL(layoutChanged()), this, SLOT(onLayoutChanged()));
     connect(m_bookmarks, SIGNAL(tagListChanged()), ui->tableWidgetTagList, SLOT(updateTags()));
     connect(m_bookmarks, SIGNAL(tagListFilter()), ui->tableWidgetTagList, SLOT(filterTags()));
+    connect(m_bookmarks, SIGNAL(tagListFilter()), this, SLOT(emitTagListModified()));
     connect(m_bookmarks, SIGNAL(bookmarksChanged()), bookmarksTableModel, SLOT(update()));
 }
 
@@ -277,6 +278,11 @@ void DockBookmarks::resetSorting()
 void DockBookmarks::showContextMenu(const QPoint &pos)
 {
     contextmenu->popup(ui->tableViewFrequencyList->viewport()->mapToGlobal(pos));
+}
+
+void DockBookmarks::emitTagListModified()
+{
+    emit tagListModified();
 }
 
 void DockBookmarks::tagsDblClicked(const QModelIndex &index)

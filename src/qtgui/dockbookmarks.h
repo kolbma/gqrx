@@ -62,6 +62,7 @@ signals:
     void bookmarkModified();
     void newBookmarkActivated(qint64, QString, int);
     void newBookmarkAdd();
+    void tagListModified();
 
 public slots:
     void setNewFrequency(qint64 rx_freq);
@@ -86,5 +87,6 @@ private slots:
     void onLayoutChanged();
     void resetSorting();
     void showContextMenu(const QPoint &pos);
+    void emitTagListModified();
     void tagsDblClicked(const QModelIndex &index);
 };
