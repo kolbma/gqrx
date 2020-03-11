@@ -269,7 +269,7 @@ BookmarkInfo &Bookmarks::getBookmark(const QUuid &id)
     return *m_bookmarkIdMap[id];
 }
 
-QList<const BookmarkInfo *> Bookmarks::getBookmarksInRange(qint64 low, qint64 high) const
+QList<const BookmarkInfo *> Bookmarks::getBookmarksInRange(qint64 low, qint64 high, bool filtered) const
 {
     BookmarkInfo infoBound;
     infoBound.frequency=low;
@@ -282,7 +282,20 @@ QList<const BookmarkInfo *> Bookmarks::getBookmarksInRange(qint64 low, qint64 hi
     while (lb != ub)
     {
         const BookmarkInfo *info = &(*lb);
-        found.append(info);
+        bool show = !filtered;
+        if (!show)
+        {
+            for (const auto tag : info->tags)
+            {
+                if (tag->show)
+                {
+                    show = true;
+                    break;
+                }
+            }
+        }
+        if (show)
+            found.append(info);
         lb++;
     }
 
