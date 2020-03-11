@@ -237,7 +237,7 @@ public:
      */
     BookmarkInfo &getBookmark(const QUuid &id);
 
-    QList<const BookmarkInfo *> getBookmarksInRange(qint64 low, qint64 high) const;
+    QList<const BookmarkInfo *> getBookmarksInRange(qint64 low, qint64 high, bool filtered = true) const;
 
     const QList<TagInfo> &getTagList() const { return m_tagList; }
 
