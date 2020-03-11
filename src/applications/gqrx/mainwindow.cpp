@@ -263,6 +263,7 @@ MainWindow::MainWindow(const QString cfgfile, bool edit_conf, QWidget *parent) :
     connect(uiDockBookmarks, SIGNAL(bookmarkModified()), this, SLOT(onBookmarkModified()));
     connect(uiDockBookmarks, SIGNAL(newBookmarkActivated(qint64, QString, int)), this, SLOT(onBookmarkActivated(qint64, QString, int)));
     connect(uiDockBookmarks, SIGNAL(newBookmarkAdd()), this, SLOT(on_actionAddBookmark_triggered()));
+    connect(uiDockBookmarks, SIGNAL(tagListModified()), ui->plotter, SLOT(updateOverlay()));
 
     // FrequencyHistory
     connect(&freq_history, &FreqHistory::history_first, this, &MainWindow::on_FHFirst);
