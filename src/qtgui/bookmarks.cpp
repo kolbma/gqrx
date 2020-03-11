@@ -24,9 +24,7 @@
 
 #include <algorithm>
 
-#ifndef QT_NO_DEBUG_OUTPUT
 #include <QDebug>
-#endif
 #include <QSet>
 #include <QTemporaryFile>
 #include <QTextStream>
@@ -253,15 +251,20 @@ TagInfo &Bookmarks::findOrAddTag(const QString &tagName, bool markModified)
 
     const TagInfo info(tagName, markModified);
     m_tagList.append(info);
+
     const int idx = m_tagList.indexOf(trimName);
-    if (idx >= 0)
+    if (idx < 0)
     {
-        emit tagListChanged();
-        if (markModified && trimName != TagInfo::UNTAGGED)
-            m_bmModified = true; // only set for non-UNTAGGED
-        return m_tagList[idx];
+        Q_ASSERT(false);
+        throw "bug in Bookmarks::findOrAddTag";
     }
-    Q_ASSERT(false);
+
+    emit tagListChanged();
+
+    if (markModified && trimName != TagInfo::UNTAGGED)
+        m_bmModified = true; // only set for non-UNTAGGED
+
+    return m_tagList[idx];
 }
 
 BookmarkInfo &Bookmarks::getBookmark(const QUuid &id)
