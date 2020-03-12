@@ -51,13 +51,6 @@ public:
     QList<TagInfo *> getCheckedTags();
 
     /**
-     * @brief getRow for QUUid id
-     * @param id
-     * @return int row nr
-     */
-    //int getRow(const QUUid &id);
-
-    /**
      * @brief set checked/unchecked based on active state
      * @param tags
      */
