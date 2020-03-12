@@ -338,12 +338,12 @@ bool Bookmarks::load()
         m_tagList.clear();
 
         // always create the UNTAGGED entry for enable filter on not tagged bookmarks
-        auto untaggedTag = findOrAddTag(TagInfo::UNTAGGED, false);
+        auto &untaggedTag = findOrAddTag(TagInfo::UNTAGGED, false);
 
         // Read Tags, until first empty line.
         while (!stream.atEnd())
         {
-            auto line = stream.readLine().trimmed();
+            const auto line = stream.readLine().trimmed();
 
             if(line.isEmpty()) // jump to next block
                 break;
@@ -351,13 +351,19 @@ bool Bookmarks::load()
             if(line.startsWith("#")) // trimmed line
                 continue;
 
-            QStringList list = csvsplit(line, 2);
+            int listcount = 3;
+            QStringList list = csvsplit(line, listcount);
+            if (list.isEmpty())
+                list = csvsplit(line, --listcount);
 
-            if(list.count() == 2)
+            if(list.count() == listcount)
             {
-                auto info = findOrAddTag(list[0], false); // emits tagListChanged()
+                auto &info = findOrAddTag(list[0], false); // emits tagListChanged()
                 info.modified = false;  // freshly read
                 info.color = QColor(list[1]);
+
+                if (listcount == 3)
+                    info.show = list[2].toInt() > 0 ? true : false;
             }
 #ifndef QT_NO_DEBUG_OUTPUT
             else
@@ -370,7 +376,7 @@ bool Bookmarks::load()
         // Read Bookmarks, after first empty line.
         while (!stream.atEnd())
         {
-            auto line = stream.readLine().trimmed();
+            const auto line = stream.readLine().trimmed();
 
             // Hint: if there are more changes in field count, you could read the field count
             //       from this comment line
@@ -519,6 +525,7 @@ void Bookmarks::setTagShow(TagInfo &tagInfo, bool show)
     if (tagInfo.show != show)
     {
         tagInfo.show = show;
+        tagInfo.modified = true; // for saving the status
         emit tagListFilter();
     }
 }
@@ -563,7 +570,7 @@ bool Bookmarks::save()
         QTextStream stream(&tmp);
 
         stream << QString("# Tag name").leftJustified(FIELD_WIDTH_TAG) << CSV_SEPARATOR2 <<
-                  QString(" color") << endl;
+                  QString(" color  ") << CSV_SEPARATOR2 << QString("filter") << endl;
 
         bool usedInfoField = false;
 
@@ -586,7 +593,8 @@ bool Bookmarks::save()
         {
             TagInfo &info = **it;
             stream << csvquote(info.name, FIELD_WIDTH_TAG) <<
-                      CSV_SEPARATOR2 << info.color.name() << endl;
+                      CSV_SEPARATOR2 << info.color.name() << " " <<
+                      CSV_SEPARATOR2 << (info.show ? 1 : 0) << endl;
         }
 
         stream << endl <<
