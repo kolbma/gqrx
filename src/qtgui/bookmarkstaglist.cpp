@@ -44,7 +44,6 @@ BookmarksTagList::BookmarksTagList(QWidget *parent, bool bShowUntagged, Variant 
     connect(this, SIGNAL(customContextMenuRequested(const QPoint&)),
             this, SLOT(showContextMenu(const QPoint&)));
 
-    //horizontalHeader()->setVisible(false);
     horizontalHeader()->setStretchLastSection(true);
 
     verticalHeader()->setVisible(false);
