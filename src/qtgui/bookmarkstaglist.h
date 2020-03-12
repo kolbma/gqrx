@@ -51,13 +51,20 @@ public:
     QList<TagInfo *> getCheckedTags();
 
     /**
+     * @brief getRow for QUUid id
+     * @param id
+     * @return int row nr
+     */
+    //int getRow(const QUUid &id);
+
+    /**
      * @brief set checked/unchecked based on active state
      * @param tags
      */
     void setTagsCheckState(const QList<TagInfo*> &tags);
 
 public slots:
-    void addTag(const QUuid &id, const QString &name, Qt::CheckState checkstate = Qt::Checked,
+    int addTag(const QUuid &id, const QString &name, Qt::CheckState checkstate = Qt::Checked,
                 const QColor &color = TagInfo::DEFAULT_COLOR);
     void addNewTag();
     void changeColor(int row);

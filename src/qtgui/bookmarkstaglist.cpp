@@ -127,12 +127,15 @@ void BookmarksTagList::setTagsCheckState(const QList<TagInfo*> &tags)
     }
 }
 
-void BookmarksTagList::addTag(const QUuid &id, const QString &name, Qt::CheckState checkstate, const QColor &color)
+int BookmarksTagList::addTag(const QUuid &id, const QString &name, Qt::CheckState checkstate, const QColor &color)
 {
-    int i = rowCount();
-    setRowCount(i + 1);
+    m_blockSlot = true;
 
+    const bool sort = isSortingEnabled();
     setSortingEnabled(false);
+
+    const int i = rowCount();
+    setRowCount(i + 1);
 
     // Column 1
     auto *item = new QTableWidgetItem(name);
@@ -148,7 +151,12 @@ void BookmarksTagList::addTag(const QUuid &id, const QString &name, Qt::CheckSta
     item->setBackgroundColor(color);
     setItem(i, 0, item);
 
-    setSortingEnabled(true);
+    if (sort)
+        setSortingEnabled(sort);
+
+    m_blockSlot = false;
+
+    return row(item);
 }
 
 void BookmarksTagList::addNewTag()
@@ -156,12 +164,15 @@ void BookmarksTagList::addNewTag()
     TagInfo tagInfo;
     m_bookmarks->addTagInfo(tagInfo);
 
-    addTag(tagInfo.id, "*enter tag name*", tagInfo.checked ? Qt::Checked : Qt::Unchecked);
-    scrollToBottom();
+    const int row = addTag(tagInfo.id, "*enter tag name*", tagInfo.checked ? Qt::Checked : Qt::Unchecked);
 
-    const int rowcount = rowCount();
-    const auto pItem = item(rowcount - 1, 1);
-    editItem(pItem);
+    selectRow(row);
+
+    const QModelIndexList selected = selectionModel()->selectedRows();
+    if (!selected.empty())
+        scrollToItem(item(selected.first().row(), 1));
+
+    renameSelectedTag();
 }
 
 void BookmarksTagList::changeColor(int row)
@@ -236,6 +247,7 @@ void BookmarksTagList::on_itemChanged(QTableWidgetItem *item)
     else if (text.isEmpty() || tagInfo.name == TagInfo::UNTAGGED)
     {
         item->setText(tagInfo.name);
+        scrollToItem(item);
         return;
     }
 
@@ -243,6 +255,7 @@ void BookmarksTagList::on_itemChanged(QTableWidgetItem *item)
     {
         m_blockSlot = true;
         item->setText(tagInfo.name);
+        scrollToItem(item);
         m_blockSlot = false;
         return;
     }
@@ -255,7 +268,7 @@ void BookmarksTagList::on_itemChanged(QTableWidgetItem *item)
 
 void BookmarksTagList::renameSelectedTag()
 {
-    QModelIndexList selected = selectionModel()->selectedRows();
+    const QModelIndexList selected = selectionModel()->selectedRows();
 
     if(!selected.empty())
         editItem(item(selected.first().row(), 1));
@@ -338,10 +351,21 @@ void BookmarksTagList::toggleCheckedState(int row, int column)
 
 void BookmarksTagList::updateTags()
 {
+    if (m_blockSlot)
+        return;
+
     m_blockSlot = true;
 
     // Get current List of Tags
     const QList<TagInfo> &tagList = m_bookmarks->getTagList();
+
+    setSortingEnabled(false);
+
+    QTableWidgetItem *selitem = nullptr;
+    const QModelIndexList selected = selectionModel()->selectedRows();
+    QUuid id;
+    if (!selected.isEmpty())
+        id = item(selected.first().row(), 1)->data(Bookmarks::ID_ROLE).value<QUuid>();
 
     // Rebuild List in GUI
     clearContents();
@@ -360,9 +384,16 @@ void BookmarksTagList::updateTags()
             {
                 checked = tag.checked;
             }
-            addTag(tag.id, tag.name, checked ? Qt::Checked : Qt::Unchecked, tag.color);
+            const int row = addTag(tag.id, tag.name, checked ? Qt::Checked : Qt::Unchecked, tag.color);
+            if (id == item(row, 1)->data(Bookmarks::ID_ROLE).value<QUuid>())
+                selitem = item(row, 1);
         }
     }
+
+    setSortingEnabled(true);
+
+    if (selitem)
+        scrollToItem(selitem);
 
     m_blockSlot = false;
 }
