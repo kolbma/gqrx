@@ -175,7 +175,7 @@ bool BookmarkInfo::operator<(const BookmarkInfo &other) const
 
 bool BookmarkInfo::operator==(const BookmarkInfo &other) const
 {
-    return (!id.isNull() && id == other.id) || frequency == other.frequency;
+    return !id.isNull() && id == other.id;
 }
 
 bool BookmarkInfo::operator!=(const BookmarkInfo &other) const
@@ -208,13 +208,14 @@ Bookmarks &Bookmarks::instance()
 
 void Bookmarks::add(BookmarkInfo &info, bool markModified)
 {
-    m_bookmarkList.append(info);
-    auto &last = m_bookmarkList.last();
+    m_bookmarkList->append(info);
+    auto &last = m_bookmarkList->last();
     if (last.id != info.id)
     {
-        last = m_bookmarkList[m_bookmarkList.indexOf(info)];
+        last = (*m_bookmarkList)[m_bookmarkList->indexOf(info)];
     }
-    m_bookmarkIdMap.insert(info.id, &last);
+    m_bookmarkIdMap->insert(info.id, &last);
+    m_bookmarkFreqMap->insertMulti(info.frequency, info.id);
     if (markModified)
     {
         emit bookmarksChanged();
@@ -269,22 +270,19 @@ TagInfo &Bookmarks::findOrAddTag(const QString &tagName, bool markModified)
 
 BookmarkInfo &Bookmarks::getBookmark(const QUuid &id)
 {
-    return *m_bookmarkIdMap[id];
+    return *(*m_bookmarkIdMap)[id];
 }
 
 QList<const BookmarkInfo *> Bookmarks::getBookmarksInRange(qint64 low, qint64 high, bool filtered) const
 {
-    BookmarkInfo infoBound;
-    infoBound.frequency=low;
-    auto lb = std::lower_bound(m_bookmarkList.cbegin(), m_bookmarkList.cend(), infoBound);
-    infoBound.frequency=high;
-    auto ub = std::upper_bound(m_bookmarkList.cbegin(), m_bookmarkList.cend(), infoBound);
+    auto lb = m_bookmarkFreqMap->lowerBound(low);
+    const auto ub = m_bookmarkFreqMap->upperBound(high);
 
     QList<const BookmarkInfo *> found;
 
     while (lb != ub)
     {
-        const BookmarkInfo *info = &(*lb);
+        const BookmarkInfo *info = (*m_bookmarkIdMap)[lb.value()];
         bool show = !filtered;
         if (!show)
         {
@@ -334,7 +332,7 @@ bool Bookmarks::load()
         QTextStream stream(&file);
 
         m_bmModified = false; // no save during loading
-        m_bookmarkList.clear();
+        m_bookmarkList->clear();
         m_tagList.clear();
 
         // always create the UNTAGGED entry for enable filter on not tagged bookmarks
@@ -421,16 +419,16 @@ bool Bookmarks::load()
         file.close();
 
 #ifndef QT_NO_DEBUG_OUTPUT
-        for (int i = 0; i < m_tagList.count(); i++)
+        for (const auto &tag : m_tagList)
         {
-            qDebug() << m_tagList[i].name << m_tagList[i].color;
+            qDebug() << tag.name << tag.color;
         }
-        for (int i = 0; i < m_bookmarkList.count(); i++)
+        for (const auto &info : *m_bookmarkList)
         {
-            qDebug() << m_bookmarkList[i].name << m_bookmarkList[i].frequency << m_bookmarkList[i].modulation << m_bookmarkList[i].bandwidth;
-            for (int t = 0; t < m_bookmarkList[i].tags.count(); t++)
+            qDebug() << info.name << info.frequency << info.modulation << info.bandwidth;
+            for (const auto tag : info.tags)
             {
-                qDebug() << m_bookmarkList[i].tags[t]->name;
+                qDebug() << tag->name;
             }
         }
 #endif
@@ -444,10 +442,19 @@ bool Bookmarks::load()
 
 void Bookmarks::remove(const QUuid &id)
 {
-    m_bookmarkList.removeOne(*m_bookmarkIdMap.find(id));
-    m_bookmarkIdMap.remove(id);
+    const auto freq = m_bookmarkFreqMap->key(id);
+    auto it = m_bookmarkFreqMap->find(freq);
+    while (it != m_bookmarkFreqMap->cend() && it.key() == freq)
+    {
+        if (it.value() == id)
+            m_bookmarkFreqMap->erase(it);
+        ++it;
+    }
+    m_bookmarkList->removeOne(**m_bookmarkIdMap->find(id));
+    m_bookmarkIdMap->remove(id);
     m_bmModified = true;
     emit bookmarksChanged();
+    emit tagListFilter();
 }
 
 bool Bookmarks::removeTagInfo(TagInfo &tagInfo)
@@ -456,8 +463,8 @@ bool Bookmarks::removeTagInfo(TagInfo &tagInfo)
         return false;
 
     // Delete Tag from all Bookmarks that use it.
-    const auto bmlist_end = m_bookmarkList.cend();
-    for (auto it = m_bookmarkList.begin(); it != bmlist_end; it++)
+    const auto bmlist_end = m_bookmarkList->cend();
+    for (auto it = m_bookmarkList->begin(); it != bmlist_end; it++)
     {
         it->removeTagInfo(&tagInfo);
         if (it->tags.count() == 0)
@@ -547,8 +554,8 @@ bool Bookmarks::save()
             }
         }
         {
-            const auto it_end = m_bookmarkList.cend();
-            for (auto it = m_bookmarkList.begin(); it != it_end; it++)
+            const auto it_end = m_bookmarkList->cend();
+            for (auto it = m_bookmarkList->begin(); it != it_end; it++)
             {
                 if (it->modified)
                 {
@@ -574,11 +581,11 @@ bool Bookmarks::save()
 
         bool usedInfoField = false;
 
-        const int bookmarkSize = m_bookmarkList.size();
+        const int bookmarkSize = m_bookmarkList->size();
         QSet<TagInfo*> usedTags;
         for (int ib = 0; ib < bookmarkSize; ib++)
         {
-            BookmarkInfo &info = m_bookmarkList[ib];
+            BookmarkInfo &info = (*m_bookmarkList)[ib];
             const int tagssize = info.tags.size();
             for(int i = 0; i < tagssize; ++i)
             {
@@ -615,11 +622,11 @@ bool Bookmarks::save()
 
         stream << endl;
 
-        TagInfo &taggedTag = findOrAddTag(TagInfo::UNTAGGED);
+        TagInfo &untaggedTag = findOrAddTag(TagInfo::UNTAGGED);
 
         for (int ib = 0; ib < bookmarkSize; ib++)
         {
-            const BookmarkInfo &info = m_bookmarkList[ib];
+            const BookmarkInfo &info = (*m_bookmarkList)[ib];
             stream << QString::number(info.frequency).rightJustified(FIELD_WIDTH_FREQ) <<
                       CSV_SEPARATOR2 << csvquote(info.name, FIELD_WIDTH_NAME) <<
                       CSV_SEPARATOR2 << info.modulation.leftJustified(FIELD_WIDTH_MOD) <<
@@ -629,7 +636,7 @@ bool Bookmarks::save()
             int justify = 0;
             for(int i = 0; i < tagssize; ++i)
             {
-                if (info.tags[i] == &taggedTag)
+                if (info.tags[i] == &untaggedTag)
                     continue;
 
                 QString s = csvquote(info.tags[i]->name);
@@ -696,7 +703,10 @@ bool Bookmarks::save()
 }
 
 Bookmarks::Bookmarks() :
-    m_bmModified(false)
+    m_bmModified(false),
+    m_bookmarkFreqMap(new QMap<qint64, QUuid>()),
+    m_bookmarkIdMap(new QMap<QUuid, BookmarkInfo *>()),
+    m_bookmarkList(new QList<BookmarkInfo>())
 {
     m_tagList.append(findOrAddTag(TagInfo::UNTAGGED));
     m_saveTimer = new QTimer(this);
@@ -710,6 +720,9 @@ Bookmarks::~Bookmarks()
     m_saveTimer->stop();
     delete m_saveTimer;
     save();
+    delete m_bookmarkFreqMap;
+    delete m_bookmarkIdMap;
+    delete m_bookmarkList;
 }
 
 QString Bookmarks::csvquote(const QString &unquoted, int minlength)

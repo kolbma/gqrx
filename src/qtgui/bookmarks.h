@@ -218,7 +218,7 @@ public:
      * @brief how many bookmarks there are
      * @return
      */
-    int count() { return m_bookmarkList.count(); }
+    int count() { return m_bookmarkList->count(); }
 
     /**
      * @brief find or add a tag with internal trimmed tagName
@@ -228,7 +228,7 @@ public:
      */
     TagInfo &findOrAddTag(const QString &tagName, bool markModified = true);
 
-    BookmarkInfo &getBookmark(int i) { return m_bookmarkList[i]; }
+    BookmarkInfo &getBookmark(int i) { return (*m_bookmarkList)[i]; }
 
     /**
      * @brief getBookmark by QUuid id, is backed by QMap<QUuid, *BookmarkInfo>
@@ -339,8 +339,9 @@ signals:
 
 private:
     bool                 m_bmModified;
-    QMap<QUuid, BookmarkInfo *> m_bookmarkIdMap;
-    QList<BookmarkInfo>  m_bookmarkList;
+    QMap<qint64, QUuid>         *m_bookmarkFreqMap;
+    QMap<QUuid, BookmarkInfo *> *m_bookmarkIdMap;
+    QList<BookmarkInfo>  *m_bookmarkList;
     QString              m_bookmarksFile;
     QTimer               *m_saveTimer;
     QList<TagInfo>       m_tagList;
