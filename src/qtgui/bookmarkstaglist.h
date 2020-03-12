@@ -24,6 +24,7 @@
 #ifndef BOOKMARKSTAGLIST_H
 #define BOOKMARKSTAGLIST_H
 
+#include <QMutex>
 #include <QTableWidget>
 
 #include "bookmarks.h"
@@ -73,9 +74,9 @@ public slots:
     void updateTags();
 
 private:
-    bool       m_blockSlot;
     Bookmarks *m_bookmarks;
     bool       m_bShowUntagged;
+    QMutex    *m_updateMutex;
     Variant    m_variant;
 
     inline TagInfo &getTagInfo(const QTableWidgetItem *pItem);
