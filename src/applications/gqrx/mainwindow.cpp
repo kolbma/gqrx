@@ -2307,7 +2307,8 @@ void MainWindow::on_actionAddBookmark_triggered()
         info.setTags(taglist->getCheckedTags()); // modified for save is detected with tags in getCheckedTags
         qDebug() << "Tags: " << info.tagsStr;
 
-        info.addTagInfo(&bookmarks.findOrAddTag(TagInfo::UNTAGGED));
+        if (info.tags.count() == 0)
+            info.addTagInfo(&bookmarks.findOrAddTag(TagInfo::UNTAGGED));
         bookmarks.add(info);
         emit bookmarks.tagListChanged();
         emit bookmarks.bookmarksChanged();
