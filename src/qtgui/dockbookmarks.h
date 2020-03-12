@@ -25,6 +25,7 @@
 
 #include <QDockWidget>
 #include <QItemDelegate>
+#include <QSettings>
 #include <QSortFilterProxyModel>
 #include <QTableWidgetItem>
 
@@ -57,6 +58,8 @@ class DockBookmarks : public QDockWidget
 public:
     explicit DockBookmarks(QWidget *parent = 0);
     ~DockBookmarks();
+    void readSettings(QSettings *settings);
+    void saveSettings(QSettings *settings);
 
 signals:
     void bookmarkModified();
