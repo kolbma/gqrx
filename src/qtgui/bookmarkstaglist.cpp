@@ -26,6 +26,7 @@
 #include <QHeaderView>
 #include <QMenu>
 #include <QMessageBox>
+#include <QMutexLocker>
 
 #include "bookmarks.h"
 #include "bookmarkstaglist.h"
@@ -34,6 +35,7 @@ BookmarksTagList::BookmarksTagList(QWidget *parent, bool bShowUntagged, Variant 
     : QTableWidget(parent),
       m_bookmarks(&Bookmarks::instance()),
       m_bShowUntagged(bShowUntagged),
+      m_updateMutex(new QMutex(QMutex::RecursionMode::Recursive)),
       m_variant(variant)
 {
     connect(this, SIGNAL(cellClicked(int, int)), this, SLOT(on_cellClicked(int, int)));
@@ -128,7 +130,7 @@ void BookmarksTagList::setTagsCheckState(const QList<TagInfo*> &tags)
 
 int BookmarksTagList::addTag(const QUuid &id, const QString &name, Qt::CheckState checkstate, const QColor &color)
 {
-    m_blockSlot = true;
+    QMutexLocker locker(m_updateMutex);
 
     const bool sort = isSortingEnabled();
     setSortingEnabled(false);
@@ -152,8 +154,6 @@ int BookmarksTagList::addTag(const QUuid &id, const QString &name, Qt::CheckStat
 
     if (sort)
         setSortingEnabled(sort);
-
-    m_blockSlot = false;
 
     return row(item);
 }
@@ -237,9 +237,11 @@ void BookmarksTagList::on_cellClicked(int row, int column)
 
 void BookmarksTagList::on_itemChanged(QTableWidgetItem *item)
 {
+    QMutexLocker locker(m_updateMutex);
+
     const QString text(item->text().trimmed());
     auto &tagInfo = getTagInfo(item);
-    if (m_blockSlot || item->column() == 0 || tagInfo.name == text)
+    if (item->column() == 0 || tagInfo.name == text)
     {
         return;
     }
@@ -252,10 +254,8 @@ void BookmarksTagList::on_itemChanged(QTableWidgetItem *item)
 
     if (m_bookmarks->getTagList().indexOf(text) >= 0)
     {
-        m_blockSlot = true;
         item->setText(tagInfo.name);
         scrollToItem(item);
-        m_blockSlot = false;
         return;
     }
 
@@ -350,10 +350,8 @@ void BookmarksTagList::toggleCheckedState(int row, int column)
 
 void BookmarksTagList::updateTags()
 {
-    if (m_blockSlot)
+    if (!m_updateMutex->tryLock())
         return;
-
-    m_blockSlot = true;
 
     // Get current List of Tags
     const QList<TagInfo> &tagList = m_bookmarks->getTagList();
@@ -394,7 +392,7 @@ void BookmarksTagList::updateTags()
     if (selitem)
         scrollToItem(selitem);
 
-    m_blockSlot = false;
+    m_updateMutex->unlock();
 }
 
 inline TagInfo &BookmarksTagList::getTagInfo(const QTableWidgetItem *pItem)
