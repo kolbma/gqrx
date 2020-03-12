@@ -151,6 +151,74 @@ DockBookmarks::~DockBookmarks()
     delete contextmenu;
 }
 
+void DockBookmarks::readSettings(QSettings *settings)
+{
+    if (!settings)
+        return;
+
+    settings->beginGroup("bookmarks");
+
+    // sizing is different when using saveGeometry as default
+    auto val = settings->value("tVFL_geometry");
+    if (!val.isNull())
+    {
+        ui->tableViewFrequencyList->restoreGeometry(val.toByteArray());
+    }
+
+    val = settings->value("splitter_geometry");
+    if (!val.isNull())
+    {
+        ui->splitter->restoreGeometry(val.toByteArray());
+    }
+
+    val = settings->value("splitter_state");
+    if (!val.isNull())
+    {
+        ui->splitter->restoreState(val.toByteArray());
+    }
+
+    val = settings->value("tWTL_geometry");
+    if (!val.isNull())
+    {
+        ui->tableWidgetTagList->restoreGeometry(val.toByteArray());
+    }
+
+    val = settings->value("tWTL_sortColumn");
+    if (!val.isNull() && val.toInt() >= 0)
+    {
+        ui->tableViewFrequencyList->sortByColumn(val.toInt());
+    }
+
+    val = settings->value("tWTL_sortOrder");
+    if (!val.isNull() && bookmarksSortModel->sortColumn() >= 0)
+    {
+        ui->tableViewFrequencyList->sortByColumn(bookmarksSortModel->sortColumn(),
+                                                 static_cast<Qt::SortOrder>(val.toInt()));
+    }
+
+    settings->endGroup();
+}
+
+void DockBookmarks::saveSettings(QSettings *settings)
+{
+    if (!settings)
+        return;
+
+    settings->beginGroup("bookmarks");
+
+    settings->setValue("tVFL_geometry", ui->tableViewFrequencyList->saveGeometry());
+
+    settings->setValue("splitter_geometry", ui->splitter->saveGeometry());
+    settings->setValue("splitter_state", ui->splitter->saveState());
+
+    settings->setValue("tWTL_geometry", ui->tableWidgetTagList->saveGeometry());
+
+    settings->setValue("tWTL_sortColumn", bookmarksSortModel->sortColumn());
+    settings->setValue("tWTL_sortOrder", bookmarksSortModel->sortOrder());
+
+    settings->endGroup();
+}
+
 void DockBookmarks::setNewFrequency(qint64 rx_freq)
 {
     ui->tableViewFrequencyList->clearSelection();
