@@ -54,7 +54,7 @@ public:
         const auto newFreq = m_CenterFreq + freq_hz;
         if (m_DemodCenterFreq != newFreq)
         {
-            m_DemodCenterFreq = m_CenterFreq + freq_hz;
+            m_DemodCenterFreq = newFreq;
             drawOverlay();
         }
     }
@@ -288,7 +288,7 @@ private:
     float       m_PeakDetection;
     QMap<int,int>   m_Peaks;
 
-    QList< QPair<QRect, qint64> >     m_BookmarkTags;
+    QList< QPair<QRect, qint64> >     m_BookmarkMarker;
 
     // Waterfall averaging
     quint64     tlast_wf_ms;        // last time waterfall has been updated
