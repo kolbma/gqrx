@@ -35,7 +35,7 @@ BookmarksTagList::BookmarksTagList(QWidget *parent, bool bShowUntagged, Variant 
     : QTableWidget(parent),
       m_bookmarks(&Bookmarks::instance()),
       m_bShowUntagged(bShowUntagged),
-      m_updateMutex(new QMutex(QMutex::RecursionMode::Recursive)),
+      m_updateMutex(new QMutex(QMutex::RecursionMode::NonRecursive)),
       m_variant(variant)
 {
     connect(this, SIGNAL(cellClicked(int, int)), this, SLOT(on_cellClicked(int, int)));
@@ -128,9 +128,10 @@ void BookmarksTagList::setTagsCheckState(const QList<TagInfo*> &tags)
     }
 }
 
-int BookmarksTagList::addTag(const QUuid &id, const QString &name, Qt::CheckState checkstate, const QColor &color)
+int BookmarksTagList::addTag(const QUuid &id, const QString &name, Qt::CheckState checkstate,
+                             const QColor &color, QMutex *mutex)
 {
-    QMutexLocker locker(m_updateMutex);
+    QMutexLocker locker(mutex);
 
     const bool sort = isSortingEnabled();
     setSortingEnabled(false);
@@ -160,6 +161,8 @@ int BookmarksTagList::addTag(const QUuid &id, const QString &name, Qt::CheckStat
 
 void BookmarksTagList::addNewTag()
 {
+    QMutexLocker locker(m_updateMutex);
+
     TagInfo tagInfo;
     m_bookmarks->addTagInfo(tagInfo);
 
@@ -237,8 +240,6 @@ void BookmarksTagList::on_cellClicked(int row, int column)
 
 void BookmarksTagList::on_itemChanged(QTableWidgetItem *item)
 {
-    QMutexLocker locker(m_updateMutex);
-
     const QString text(item->text().trimmed());
     auto &tagInfo = getTagInfo(item);
     if (item->column() == 0 || tagInfo.name == text)

@@ -59,7 +59,7 @@ public:
 
 public slots:
     int addTag(const QUuid &id, const QString &name, Qt::CheckState checkstate = Qt::Checked,
-                const QColor &color = TagInfo::DEFAULT_COLOR);
+                const QColor &color = TagInfo::DEFAULT_COLOR, QMutex *mutex = nullptr);
     void addNewTag();
     void changeColor(int row);
     void deleteSelectedTag();
