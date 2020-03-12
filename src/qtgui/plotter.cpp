@@ -211,17 +211,20 @@ void CPlotter::mouseMoveEvent(QMouseEvent* event)
         //is in Overlay bitmap region
         if (event->buttons() == Qt::NoButton)
         {
-            bool onTag = false;
-            if(pt.y() < 15 * 10) // FIXME
+            bool onMarker = false;
+            if (pt.y() < 15 * 10) // FIXME
             {
-                for(int i = 0; i < m_BookmarkTags.size() && !onTag; i++)
+                for (const auto markerPair : m_BookmarkMarker)
                 {
-                    if (m_BookmarkTags[i].first.contains(event->pos()))
-                        onTag = true;
+                    if (markerPair.first.contains(event->pos()))
+                    {
+                        onMarker = true;
+                        break;
+                    }
                 }
             }
             // if no mouse button monitor grab regions and change cursor icon
-            if (onTag)
+            if (onMarker)
             {
                 setCursor(QCursor(Qt::PointingHandCursor));
                 m_CursorCaptured = BOOKMARK;
@@ -689,12 +692,16 @@ void CPlotter::mousePressEvent(QMouseEvent * event)
         }
         else if (m_CursorCaptured == BOOKMARK)
         {
-            for (int i = 0; i < m_BookmarkTags.size(); i++)
+            for (const auto markerPair : m_BookmarkMarker)
             {
-                if (m_BookmarkTags[i].first.contains(event->pos()))
+                if (markerPair.first.contains(event->pos()))
                 {
-                    m_DemodCenterFreq = m_BookmarkTags[i].second;
-                    emit newDemodFreq(m_DemodCenterFreq, m_DemodCenterFreq - m_CenterFreq);
+                    if (markerPair.second != m_DemodCenterFreq)
+                    {
+                        m_DemodCenterFreq = markerPair.second;
+                        emit newDemodFreq(m_DemodCenterFreq, m_DemodCenterFreq - m_CenterFreq);
+                        drawOverlay();
+                    }
                     break;
                 }
             }
@@ -1283,7 +1290,7 @@ void CPlotter::drawOverlay()
 
     if (m_BookmarksEnabled)
     {
-        m_BookmarkTags.clear();
+        m_BookmarkMarker.clear();
         static const QFontMetrics fm(painter.font());
         static const int fontHeight = fm.ascent() + 1;
         static const int slant = 5;
@@ -1310,9 +1317,10 @@ void CPlotter::drawOverlay()
                 level = 0;
 
             tagEnd[level] = x + nameWidth + slant - 1;
-            m_BookmarkTags.append(qMakePair<QRect, qint64>(QRect(x, level * levelHeight,
-                                                                 nameWidth + slant, fontHeight),
-                                                           bookmark->frequency));
+            m_BookmarkMarker.append(qMakePair<QRect, qint64>(
+                                        QRect(x, level * levelHeight,
+                                              nameWidth + slant, fontHeight),
+                                        bookmark->frequency));
 
             QColor color = QColor(bookmark->getColor());
             color.setAlpha(0x60);
